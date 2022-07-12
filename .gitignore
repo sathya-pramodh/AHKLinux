@@ -1,4 +1,8 @@
 # Byte-compiled / optimized / DLL files
+src/AHKLinux.egg-info
+src/AHKLinux/__pycache__/
+src/AHKLinux/base_classes/__pycache__/
+src/AHKLinux/lexer/__pycache__/
 __pycache__/
 *.py[cod]
 *$py.class
