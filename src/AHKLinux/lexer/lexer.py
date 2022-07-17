@@ -1,4 +1,6 @@
 from base_classes.tokens import Token
+from base_classes.token_stream import TokenStream
+from error_classes.unexpected_token_error import UnexpectedTokenError
 import re
 
 
@@ -9,74 +11,104 @@ class Lexer:
 
     def __init__(self, contents):
         self._contents = contents
-        self._token_stream = []
+        self._token_list = []
 
     def lex(self):
         self._tokenize()
-        return self._token_stream
+        return TokenStream(self._token_list)
 
     def _tokenize(self):
-        token = ""
+        self._read_line_no = 1
+        self._contents = self._contents.strip()
         for line in self._contents.split("\n"):
-            line += " "
-            end_of_line = len(line) - 1
-            pos = 0
-            is_comment = False
-            is_string = False
-            for char in line:
-                if char == " " and not is_string:
-                    if pos == end_of_line or not is_comment:
-                        self._classify_token(token)
-                        token = ""
-                    else:
-                        token += char
-                elif char == '"':
-                    is_string = not is_string
-                    token += char
-                elif char == ";":
-                    is_comment = True
-                    token += char
-                else:
-                    token += char
-                pos += 1
+            assignment_match = re.search(r".+:=.+", line)
+            only_comment_match = re.search(r"^;.+$", line)
+            if assignment_match:
+                self._handle_assigment_line(line)
+            if only_comment_match:
+                self._classify_token(line)
+
+            self._read_line_no += 1
 
     def _classify_token(self, token):
         if token == "global":
-            self._token_stream.append(Token("GLOBAL", token))
+            self._token_list.append(Token("GLOBAL", token))
             return
 
         if token == "true" or token == "false":
-            self._token_stream.append(Token("BOOLEAN", token))
+            self._token_list.append(Token("BOOLEAN", token))
             return
 
         if token == ":=":
-            self._token_stream.append(Token("EQUALS", token))
+            self._token_list.append(Token("EQUALS", token))
             return
 
         string_match = re.search(r'^".+"$', token)
-        if string_match:
-            self._token_stream.append(Token("STRING", token))
+        string_error_check = re.search(r'^""+.+"+"$', token) or token.count('"') == 1
+        if string_match and not string_error_check:
+            self._token_list.append(Token("STRING", token))
             return
 
         integer_match = re.search(r"^\d+[^x]", token)
         if integer_match:
             if "." in token:
-                self._token_stream.append(Token("FLOATING", token))
+                self._token_list.append(Token("FLOATING", token))
             else:
-                self._token_stream.append(Token("DECIMAL", token))
+                self._token_list.append(Token("DECIMAL", token))
             return
 
         hex_match = re.search(r"^0x[0-9]+", token)
         if hex_match and "." not in token:
-            self._token_stream.append(Token("HEXADECIMAL", token))
+            self._token_list.append(Token("HEXADECIMAL", token))
             return
 
-        variable_match = re.search(r"^[a-zA-Z_]+", token)
+        variable_match = re.search(r"^[a-zA-z_][a-zA-Z0-9_]*", token)
         if variable_match:
-            self._token_stream.append(Token("VARIABLE", token))
+            self._token_list.append(Token("VARIABLE", token))
             return
 
         comment_match = re.search(r"^;.+", token)
         if comment_match:
-            self._token_stream.append(Token("SINGLE_COMMENT", token))
+            self._token_list.append(Token("SINGLE_COMMENT", token))
             return
+
+        raise UnexpectedTokenError(
+            "Unexpected Token '{}' at line {}.".format(token, self._read_line_no)
+        )
+
+    def _handle_assigment_line(self, line):
+        left, right = line.split(":=")
+        variable_match = re.search(r"(global )?[a-zA-z_][a-zA-Z0-9_]*[^:=]", left)
+        right_match = re.search(r".+\s*;*\s*.*[^:=]", right)
+        if variable_match:
+            left.replace(" ", "")
+            if "global " in left:
+                if left.count("global ") > 1:
+                    raise UnexpectedTokenError(
+                        "Unexpected Token in '{}' in line {}".format(
+                            left, self._read_line_no
+                        )
+                    )
+                left = left.replace("global ", "")
+                self._classify_token("global")
+                self._classify_token(left)
+            else:
+                self._classify_token(left)
+        else:
+            raise UnexpectedTokenError(
+                "Unexpected Token in '{}' in line {}".format(left, self._read_line_no)
+            )
+
+        self._classify_token(":=")
+
+        if right_match:
+            if ";" in right:
+                value, comment = right.split(";")
+                self._classify_token(value.strip())
+                self._classify_token(";" + comment.strip())
+            else:
+                self._classify_token(right.strip())
+        else:
+            raise UnexpectedTokenError(
+                "Unexpected Token in '{}' in line {}".format(left, self._read_line_no)
+            )

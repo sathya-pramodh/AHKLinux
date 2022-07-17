@@ -1,0 +1,2 @@
+class UnexpectedTokenError(Exception):
+    pass
