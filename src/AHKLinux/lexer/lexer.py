@@ -1,114 +1,90 @@
-from base_classes.tokens import Token
-from base_classes.token_stream import TokenStream
-from error_classes.unexpected_token_error import UnexpectedTokenError
-import re
+from ply.lex import lex
+from ply.yacc import yacc
 
 
-class Lexer:
-    """
-    Custom lexer class for AutoHotKey.
-    """
+def main(contents):
+    reserved = {
+        "if": "IF",
+        "else": "ELSE",
+        "global": "GLOBAL",
+        "and": "AND",
+        "or": "OR",
+        "not": "NOT",
+    }
+    tokens = [
+        "KEYWORD",
+        "PLUS",
+        "MINUS",
+        "MULTIPLY",
+        "DIVIDE",
+        "LPAREN",
+        "RPAREN",
+        "LBRACE",
+        "RBRACE",
+        "VARIABLE",
+        "DECIMAL",
+        "HEXADECIMAL",
+        "FLOATING",
+        "ASSIGNMENT",
+        "STRING",
+        "SINGLE_COMMENT",
+        "MULTI_COMMENT",
+        "LESS",
+        "LESS_EQUAL",
+        "GREATER",
+        "GREATER_EQUAL",
+        "EQUAL",
+        "NOT_EQUAL",
+    ] + list(reserved.values())
 
-    def __init__(self, contents):
-        self._contents = contents
-        self._token_list = []
+    t_ignore = " "
+    t_PLUS = r"\+"
+    t_MINUS = r"-"
+    t_MULTIPLY = r"\*"
+    t_DIVIDE = r"/"
+    t_LPAREN = r"\("
+    t_RPAREN = r"\)"
+    t_LBRACE = r"{"
+    t_RBRACE = r"}"
+    t_FLOATING = r"\d+.\d+"
+    t_HEXADECIMAL = r"0x\d[^\.]"
+    t_DECIMAL = r"\d+[^.]"
+    t_ASSIGNMENT = r":="
+    t_STRING = r'".+"'
+    t_LESS = r"<"
+    t_LESS_EQUAL = r"<="
+    t_GREATER = r">"
+    t_GREATER_EQUAL = r">="
+    t_EQUAL = r"=="
+    t_NOT_EQUAL = r"!="
 
-    def lex(self):
-        self._tokenize()
-        return TokenStream(self._token_list)
+    def t_SINGLE_COMMENT(t):
+        r";.+"
+        pass
 
-    def _tokenize(self):
-        self._read_line_no = 1
-        self._contents = self._contents.strip()
-        for line in self._contents.split("\n"):
-            assignment_match = re.search(r".+:=.+", line)
-            only_comment_match = re.search(r"^;.+$", line)
-            if assignment_match:
-                self._handle_assigment_line(line)
-            if only_comment_match:
-                self._classify_token(line)
+    def t_MULTI_COMMENT(t):
+        r"/\*\n[\s\S]*\n\*/"
+        pass
 
-            self._read_line_no += 1
+    def t_VARIABLE(t):
+        r"[a-zA-Z_$][a-zA-Z_$0-9]*"
+        t.type = reserved.get(t.value, "VARIABLE")
+        return t
 
-    def _classify_token(self, token):
-        if token == "global":
-            self._token_list.append(Token("GLOBAL", token))
-            return
+    def t_ignore_new_line(t):
+        r"\n+"
+        t.lexer.lineno += t.value.count("\n")
 
-        if token == "true" or token == "false":
-            self._token_list.append(Token("BOOLEAN", token))
-            return
+    def t_error(t):
+        t.lexer.skip(1)
+        print(f"Value error {t.value[0]!r} at line {t.lineno}")
 
-        if token == ":=":
-            self._token_list.append(Token("EQUALS", token))
-            return
-
-        string_match = re.search(r'^".+"$', token)
-        string_error_check = re.search(r'^""+.+"+"$', token) or token.count('"') == 1
-        if string_match and not string_error_check:
-            self._token_list.append(Token("STRING", token))
-            return
-
-        integer_match = re.search(r"^\d+[^x]", token)
-        if integer_match:
-            if "." in token:
-                self._token_list.append(Token("FLOATING", token))
-            else:
-                self._token_list.append(Token("DECIMAL", token))
-            return
-
-        hex_match = re.search(r"^0x[0-9]+", token)
-        if hex_match and "." not in token:
-            self._token_list.append(Token("HEXADECIMAL", token))
-            return
-
-        variable_match = re.search(r"^[a-zA-z_][a-zA-Z0-9_]*", token)
-        if variable_match:
-            self._token_list.append(Token("VARIABLE", token))
-            return
-
-        comment_match = re.search(r"^;.+", token)
-        if comment_match:
-            self._token_list.append(Token("SINGLE_COMMENT", token))
-            return
-
-        raise UnexpectedTokenError(
-            "Unexpected Token '{}' at line {}.".format(token, self._read_line_no)
-        )
-
-    def _handle_assigment_line(self, line):
-        left, right = line.split(":=")
-        variable_match = re.search(r"(global )?[a-zA-z_][a-zA-Z0-9_]*[^:=]", left)
-        right_match = re.search(r".+\s*;*\s*.*[^:=]", right)
-        if variable_match:
-            left.replace(" ", "")
-            if "global " in left:
-                if left.count("global ") > 1:
-                    raise UnexpectedTokenError(
-                        "Unexpected Token in '{}' in line {}".format(
-                            left, self._read_line_no
-                        )
-                    )
-                left = left.replace("global ", "")
-                self._classify_token("global")
-                self._classify_token(left)
-            else:
-                self._classify_token(left)
-        else:
-            raise UnexpectedTokenError(
-                "Unexpected Token in '{}' in line {}".format(left, self._read_line_no)
-            )
-
-        self._classify_token(":=")
-
-        if right_match:
-            if ";" in right:
-                value, comment = right.split(";")
-                self._classify_token(value.strip())
-                self._classify_token(";" + comment.strip())
-            else:
-                self._classify_token(right.strip())
-        else:
-            raise UnexpectedTokenError(
-                "Unexpected Token in '{}' in line {}".format(left, self._read_line_no)
-            )
+    lexer = lex()
+    lexer.input(contents)
+    token_stream = []
+    while True:
+        tok = lexer.token()
+        if not tok:
+            break
+        token_stream.append(tok)
+    return token_stream

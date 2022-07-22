@@ -1,6 +1,6 @@
 import argparse
 import os
-from lexer.lexer import Lexer
+from lexer.lexer import main as lexer_main
 
 
 def main():
@@ -14,12 +14,9 @@ def main():
         raise FileNotFoundError("The file {} does not exist.".format(input_file))
     with open(input_file) as file:
         contents = file.read()
-    lexer_class = Lexer(contents)
-    token_stream = lexer_class.lex()
-    elem = token_stream.next()
-    while elem is not None:
-        print(elem._name, elem._identifier)
-        elem = token_stream.next()
+    token_stream = lexer_main(contents)
+    for token in token_stream:
+        print(token)
 
 
 if __name__ == "__main__":
