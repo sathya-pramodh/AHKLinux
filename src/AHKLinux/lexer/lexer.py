@@ -1,89 +1,156 @@
-from ply.lex import lex
+from base_classes.tokens import Token
+from base_classes.position import Position
+from error_classes.illegal_char_error import IllegalCharError
+from constants import *
 
 
-def main(contents):
-    reserved = {
-        "if": "IF",
-        "else": "ELSE",
-        "global": "GLOBAL",
-        "and": "AND",
-        "or": "OR",
-        "not": "NOT",
-    }
-    tokens = [
-        "KEYWORD",
-        "PLUS",
-        "MINUS",
-        "MULTIPLY",
-        "DIVIDE",
-        "LPAREN",
-        "RPAREN",
-        "LBRACE",
-        "RBRACE",
-        "VARIABLE",
-        "DECIMAL",
-        "HEXADECIMAL",
-        "FLOATING",
-        "ASSIGNMENT",
-        "STRING",
-        "SINGLE_COMMENT",
-        "MULTI_COMMENT",
-        "LESS",
-        "LESS_EQUAL",
-        "GREATER",
-        "GREATER_EQUAL",
-        "EQUAL",
-        "NOT_EQUAL",
-    ] + list(reserved.values())
+class Lexer:
+    def __init__(self, text, filename, context):
+        self.text = text
+        self.pos = Position(filename, 0, 1, 1, text)
+        self.context = context
+        self.current_char = self.text[self.pos.idx]
 
-    t_ignore = " "
-    t_PLUS = r"\+"
-    t_MINUS = r"-"
-    t_MULTIPLY = r"\*"
-    t_DIVIDE = r"/"
-    t_LPAREN = r"\("
-    t_RPAREN = r"\)"
-    t_LBRACE = r"{"
-    t_RBRACE = r"}"
-    t_FLOATING = r"\d+.\d+"
-    t_HEXADECIMAL = r"0x\d[^\.]"
-    t_DECIMAL = r"\d+[^.]"
-    t_ASSIGNMENT = r":="
-    t_STRING = r'".+"'
-    t_LESS = r"<"
-    t_LESS_EQUAL = r"<="
-    t_GREATER = r">"
-    t_GREATER_EQUAL = r">="
-    t_EQUAL = r"=="
-    t_NOT_EQUAL = r"!="
+    def advance(self):
+        self.pos.advance(self.current_char)
+        self.current_char = (
+            self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
+        )
 
-    def t_SINGLE_COMMENT(t):
-        r";.+"
-        pass
+    def get_previous_char(self, idx):
+        return self.text[idx - 1] if idx - 1 >= 0 else None
 
-    def t_MULTI_COMMENT(t):
-        r"/\*\n[\s\S]*\n\*/"
-        pass
+    def get_next_char(self, idx):
+        return self.text[idx + 1] if idx + 1 < len(self.text) else None
 
-    def t_VARIABLE(t):
-        r"[a-zA-Z_$][a-zA-Z_$0-9]*"
-        t.type = reserved.get(t.value, "VARIABLE")
-        return t
+    def tokenize(self):
+        tokens = []
 
-    def t_ignore_new_line(t):
-        r"\n+"
-        t.lexer.lineno += t.value.count("\n")
+        while self.current_char is not None:
+            if self.current_char in " \t\n":
+                self.advance()
+                continue
 
-    def t_error(t):
-        t.lexer.skip(1)
-        print(f"Value error {t.value[0]!r} at line {t.lineno}")
+            elif self.current_char == "+":
+                tokens.append(Token(T_PLUS, pos_start=self.pos))
 
-    lexer = lex()
-    lexer.input(contents)
-    token_stream = []
-    while True:
-        tok = lexer.token()
-        if not tok:
-            break
-        token_stream.append(tok)
-    return token_stream
+            elif self.current_char == "-":
+                tokens.append(Token(T_MINUS, pos_start=self.pos))
+
+            elif self.current_char == "*":
+                tokens.append(Token(T_MULTIPLY, pos_start=self.pos))
+
+            elif self.current_char == "/":
+                tokens.append(Token(T_DIVIDE, pos_start=self.pos))
+
+            elif self.current_char in LETTERS:
+                tokens.append(self.make_identifier())
+                continue
+
+            elif self.current_char == ":":
+                next_char = self.get_next_char(self.pos.idx)
+                if next_char is not None and next_char == "=":
+                    self.advance()
+                else:
+                    char = self.current_char
+                    return [], IllegalCharError(
+                        self.pos, self.pos, "'{}'".format(char), self.context
+                    )
+                tokens.append(Token(T_ASSIGNMENT, pos_start=self.pos))
+
+            elif self.current_char == "(":
+                tokens.append(Token(T_LPAREN, pos_start=self.pos))
+
+            elif self.current_char == ")":
+                tokens.append(Token(T_RPAREN, pos_start=self.pos))
+
+            elif self.current_char in DIGITS:
+                result, error = self.make_number()
+                if error:
+                    return [], error
+                tokens.append(result)
+                continue
+
+            else:
+                pos_start = self.pos.copy()
+                char = self.current_char
+                self.advance()
+                return [], IllegalCharError(
+                    pos_start, self.pos, "'{}'".format(char), self.context
+                )
+            self.advance()
+        return tokens, None
+
+    def make_number(self):
+        number_str = ""
+        dot_count = 0
+        x_count = 0
+        char_count = 0
+        pos_start = self.pos
+
+        while (
+            self.current_char is not None
+            and self.current_char != "\n"
+            and self.current_char in DIGITS + ".xabcdefABCDEF"
+        ):
+            if self.current_char == ".":
+                next_char = self.get_next_char(self.pos.idx)
+                if dot_count == 1 or next_char is None or next_char not in DIGITS:
+                    char = self.current_char
+                    return None, IllegalCharError(
+                        self.pos.copy(), self.pos, "'{}'".format(char), self.context
+                    )
+                dot_count += 1
+                number_str += "."
+            elif self.current_char == "x":
+                previous_char = self.get_previous_char(self.pos.idx)
+                previous_previous_char = self.get_previous_char(self.pos.idx - 1)
+                if previous_previous_char is not None:
+                    if previous_previous_char in DIGITS + LETTERS:
+                        char = self.current_char
+                        return None, IllegalCharError(
+                            self.pos.copy(), self.pos, "'{}'".format(char), self.context
+                        )
+                next_char = self.get_next_char(self.pos.idx)
+                if (
+                    x_count == 1
+                    or previous_char != "0"
+                    or previous_char is None
+                    or next_char is None
+                    or next_char not in DIGITS + "abcdefABCDEF"
+                ):
+                    char = self.current_char
+                    return None, IllegalCharError(
+                        self.pos.copy(), self.pos, "'{}'".format(char), self.context
+                    )
+                x_count += 1
+                number_str += "x"
+            elif self.current_char in "abcdefABCDEF":
+                char_count += 1
+                number_str += self.current_char
+            else:
+                number_str += self.current_char
+            self.advance()
+
+        if dot_count == 0 and x_count == 0 and char_count == 0:
+            return Token(T_DECIMAL, int(number_str), pos_start, self.pos), None
+        elif dot_count == 1 and x_count == 0 and char_count == 0:
+            return Token(T_FLOAT, float(number_str), pos_start, self.pos), None
+        elif dot_count == 0 and x_count == 1:
+            return Token(T_HEXADECIMAL, number_str, pos_start, self.pos), None
+        else:
+            char = self.current_char
+            return None, IllegalCharError(
+                self.pos.copy(), self.pos, "'{}'".format(char), self.context
+            )
+
+    def make_identifier(self):
+        identifier_str = ""
+        pos_start = self.pos.copy()
+
+        while self.current_char != None and self.current_char in LETTERS + DIGITS + "_":
+            identifier_str += self.current_char
+            self.advance()
+
+        tok_type = T_KEYWORD if identifier_str in KEYWORDS else T_IDENTIFIER
+        return Token(tok_type, identifier_str, pos_start)
