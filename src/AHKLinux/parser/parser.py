@@ -9,13 +9,7 @@ Grammar:
          : LPAREN expr RPAREN
 """
 from constants import *
-from base_classes.nodes import (
-    NumberNode,
-    BinOpNode,
-    UnaryOpNode,
-    VarAssignNode,
-    VarAccessNode,
-)
+from base_classes.nodes import *
 from parser.parse_result import ParseResult
 from error_classes.invalid_syntax_error import InvalidSyntaxError
 
