@@ -1,4 +1,3 @@
-import argparse
 import os
 from lexer.lexer import Lexer
 from parser.parser import Parser
@@ -35,23 +34,7 @@ def start_interpreter(contents, input_file, debug_mode):
     return 0
 
 
-def main():
-    input_file = "<stdin>"
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument(
-        "-i",
-        nargs="?",
-        help="The input .ahk file for the interpreter.",
-    )
-    arg_parser.add_argument(
-        "-d",
-        action="store_const",
-        const=input,
-        help="To run the interpreter in debug mode.",
-    )
-    args = arg_parser.parse_args()
-    input_file = args.i if args.i is not None else input_file
-    debug_mode = True if args.d is not None else False
+def main(input_file, debug_mode):
     if input_file != "<stdin>":
         if "~" in input_file:
             input_file = os.path.expanduser(input_file)
@@ -71,7 +54,3 @@ def main():
             code = start_interpreter(contents, input_file, debug_mode)
             if code == 1:
                 return 1
-
-
-if __name__ == "__main__":
-    main()

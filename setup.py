@@ -27,7 +27,7 @@ setup(
     install_requires=[],
     entry_points={
         "console_scripts": [
-            "ahk = AHKLinux.main:main",
+            "ahk = AHKLinux.init:start",
         ]
     },
 )
