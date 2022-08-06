@@ -16,12 +16,17 @@ def start_interpreter(contents, input_file, debug_mode):
         print(error.as_string())
         if input_file != "<stdin>":
             return 1
+    if len(tokens) == 0:
+        return 0
     parser = Parser(tokens, context)
     ast, error = parser.parse()
     if error:
         print(error.as_string())
         if input_file != "<stdin>":
             return 1
+    if len(ast) == 0:
+        return 0
+
     interpreter = Interpreter()
     for node in ast:
         result = interpreter.visit(node.node, context)
@@ -29,7 +34,7 @@ def start_interpreter(contents, input_file, debug_mode):
             print(result.error.as_string())
             if input_file != "<stdin>":
                 return 1
-        if debug_mode:
+        if debug_mode and not result.error:
             print(result.value)
     return 0
 
@@ -46,11 +51,17 @@ def main(input_file, debug_mode):
         if contents == "":
             print("The file '{}' is empty.".format(input_file))
             return 1
-        code = start_interpreter(contents, input_file, debug_mode)
-        return code
-    else:
-        while True:
-            contents = input(">> ")
-            code = start_interpreter(contents, input_file, debug_mode)
+        for line in contents.strip().split("\n"):
+            code = start_interpreter(line, input_file, debug_mode)
             if code == 1:
                 return 1
+        return 0
+    else:
+        try:
+            while True:
+                contents = input(">> ")
+                code = start_interpreter(contents, input_file, debug_mode)
+                if code == 1:
+                    return 1
+        except KeyboardInterrupt:
+            return 0

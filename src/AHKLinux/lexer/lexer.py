@@ -9,7 +9,10 @@ class Lexer:
         self.text = text
         self.pos = Position(filename, 0, 1, 1, text)
         self.context = context
-        self.current_char = self.text[self.pos.idx]
+        if self.text == "":
+            self.current_char = None
+        else:
+            self.current_char = self.text[self.pos.idx]
 
     def advance(self):
         self.pos.advance(self.current_char)
@@ -25,11 +28,16 @@ class Lexer:
 
     def tokenize(self):
         tokens = []
+        if self.text == "":
+            return [], None
 
         while self.current_char is not None:
             if self.current_char in " \t\n":
                 self.advance()
                 continue
+
+            elif self.current_char == ".":
+                tokens.append(Token(T_CONCAT, pos_start=self.pos))
 
             elif self.current_char == "+":
                 tokens.append(Token(T_PLUS, pos_start=self.pos))
@@ -43,7 +51,7 @@ class Lexer:
             elif self.current_char == "/":
                 tokens.append(Token(T_DIVIDE, pos_start=self.pos))
 
-            elif self.current_char in LETTERS:
+            elif self.current_char in LETTERS + "@#_$":
                 tokens.append(self.make_identifier())
                 continue
 
@@ -69,6 +77,18 @@ class Lexer:
                 if error:
                     return [], error
                 tokens.append(result)
+                continue
+
+            elif self.current_char == '"':
+                self.advance()
+                pos_start = self.pos.copy()
+                value = self.make_string()
+                if self.current_char != '"':
+                    return [], IllegalCharError(
+                        pos_start, self.pos, "Expected '{}'".format('"'), self.context
+                    )
+                tokens.append(Token(T_STRING, value, pos_start=self.pos))
+                self.advance()
                 continue
 
             else:
@@ -148,9 +168,20 @@ class Lexer:
         identifier_str = ""
         pos_start = self.pos.copy()
 
-        while self.current_char != None and self.current_char in LETTERS + DIGITS + "_":
+        while (
+            self.current_char is not None
+            and self.current_char in LETTERS + DIGITS + "_#@$"
+        ):
             identifier_str += self.current_char
             self.advance()
 
         tok_type = T_KEYWORD if identifier_str in KEYWORDS else T_IDENTIFIER
         return Token(tok_type, identifier_str, pos_start)
+
+    def make_string(self):
+        string_value = ""
+        pos_start = self.pos.copy()
+        while self.current_char is not None and self.current_char != '"':
+            string_value += self.current_char
+            self.advance()
+        return string_value

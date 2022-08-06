@@ -1,11 +1,14 @@
 """
 Grammar:
     expression: (KEYWORD:global)* IDENTIFIER ASSIGNMENT expression
+              : (KEYWORD:global)* IDENTIFIER
               : term (PLUS|MINUS term)*
+              : term:STRING (CONCAT term:STRING)*
     term: factor (MULTIPLY|DIVIDE factor)*
+        : factor:STRING (CONCAT factor:STRING)*
     factor: (PLUS|MINUS) factor
           : atom
-    atom : DECIMAL|HEXADECIMAL|FLOAT
+    atom : DECIMAL|HEXADECIMAL|FLOAT|STRING
          : LPAREN expr RPAREN
 """
 from constants import *
@@ -36,6 +39,8 @@ class Parser:
     def parse(self):
         ast = []
         while self.tok_idx < len(self.tokens):
+            if self.current_tok is None:
+                return [], None
             res = self.expression()
             if res.error:
                 return [], res.error
@@ -100,16 +105,22 @@ class Parser:
                 if res.error:
                     return res
                 return res.success(VarAssignNode(var_name, expr))
-            elif self.current_tok.type in (T_PLUS, T_MINUS, T_MULTIPLY, T_DIVIDE):
+            elif self.current_tok.type in (
+                T_PLUS,
+                T_MINUS,
+                T_MULTIPLY,
+                T_DIVIDE,
+                T_CONCAT,
+            ):
                 self.recede()
 
-        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS)))
+        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_CONCAT)))
         if res.error:
             return res
         return res.success(node)
 
     def term(self):
-        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE))
+        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_CONCAT))
 
     def factor(self):
         res = ParseResult()
@@ -129,6 +140,7 @@ class Parser:
             if res.error:
                 return res
             return res.success(UnaryOpNode(tok, factor))
+
         return self.atom()
 
     def atom(self):
@@ -138,6 +150,10 @@ class Parser:
         if tok.type in (T_DECIMAL, T_FLOAT, T_HEXADECIMAL):
             self.advance()
             return res.success(NumberNode(tok))
+
+        elif tok.type == T_STRING:
+            self.advance()
+            return res.success(StringNode(tok))
 
         elif tok.type == T_IDENTIFIER:
             self.advance()
@@ -160,7 +176,7 @@ class Parser:
             InvalidSyntaxError(
                 tok.pos_start,
                 tok.pos_end,
-                "Expected int, float or hexadecimal.",
+                "Expected int, float, hexadecimal or string.",
                 self.context,
             )
         )

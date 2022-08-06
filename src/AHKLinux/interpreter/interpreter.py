@@ -1,8 +1,7 @@
-from base_classes.values import Number
+from base_classes.values import *
 from error_classes.runtime_error import RunTimeError
 from constants import *
 from interpreter.runtime_result import RuntimeResult
-import sys
 
 
 class Interpreter:
@@ -21,11 +20,22 @@ class Interpreter:
             .set_pos(node.pos_start, node.pos_end)
         )
 
+    def visit_StringNode(self, node, context):
+        return RuntimeResult().success(
+            String(node.tok.value)
+            .set_context(context)
+            .set_pos(node.pos_start, node.pos_end)
+        )
+
     def visit_VarAccessNode(self, node, context):
         res = RuntimeResult()
         var_name = node.var_name_tok.value
-        value = context.symbol_table.get(var_name)
-        if not value:
+        var_value = None
+        for name, value in context.symbol_table.symbols.items():
+            if name.lower() == var_name.lower():
+                var_value = value
+
+        if not var_value:
             return res.failure(
                 RunTimeError(
                     node.pos_start,
@@ -34,19 +44,24 @@ class Interpreter:
                     context,
                 )
             )
-        return res.success(value)
+        var_value = var_value.copy().set_pos(node.pos_start, node.pos_end)
+        return res.success(var_value)
 
     def visit_VarAssignNode(self, node, context):
         res = RuntimeResult()
         var_name = node.var_name_tok.value
-        value = res.register(self.visit(node.value_node, context))
+        var_value = res.register(self.visit(node.value_node, context))
         if res.error:
             return res
+        for name in context.symbol_table.symbols.keys():
+            if name.lower() == var_name.lower():
+                context.symbol_table.symbols[name] = var_value
+                break
         if node.scope == "global":
-            context.symbol_table.set(var_name, value, global_=True)
+            context.symbol_table.set(var_name, var_value, global_=True)
         else:
-            context.symbol_table.set(var_name, value)
-        return res.success(value)
+            context.symbol_table.set(var_name, var_value)
+        return res.success(var_value)
 
     def visit_BinOpNode(self, node, context):
         res = RuntimeResult()
@@ -75,6 +90,11 @@ class Interpreter:
         elif node.op_tok.type == T_DIVIDE:
             result, error = left.divided_by(right)
 
+            if error:
+                return res.failure(error)
+            return res.success(result.set_pos(node.pos_start, node.pos_end))
+        elif node.op_tok.type == T_CONCAT:
+            result, error = left.concatenated_to(right)
             if error:
                 return res.failure(error)
             return res.success(result.set_pos(node.pos_start, node.pos_end))
