@@ -5,9 +5,9 @@ from constants import *
 
 
 class Lexer:
-    def __init__(self, text, filename, context):
+    def __init__(self, text, filename, context, lineno):
         self.text = text
-        self.pos = Position(filename, 0, 1, 1, text)
+        self.pos = Position(filename, 0, lineno, text)
         self.context = context
         if self.text == "":
             self.current_char = None
@@ -15,7 +15,7 @@ class Lexer:
             self.current_char = self.text[self.pos.idx]
 
     def advance(self):
-        self.pos.advance(self.current_char)
+        self.pos.advance()
         self.current_char = (
             self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
         )
@@ -32,12 +32,12 @@ class Lexer:
             return [], None
 
         while self.current_char is not None:
-            if self.current_char in " \t\n":
+            if self.current_char in " \t\n,":
                 self.advance()
                 continue
 
             elif self.current_char == ".":
-                tokens.append(Token(T_CONCAT, pos_start=self.pos))
+                tokens.append(Token(T_DOT, pos_start=self.pos))
 
             elif self.current_char == "+":
                 tokens.append(Token(T_PLUS, pos_start=self.pos))
@@ -82,14 +82,25 @@ class Lexer:
             elif self.current_char == '"':
                 self.advance()
                 pos_start = self.pos.copy()
-                value = self.make_string()
+                tok = self.make_string()
                 if self.current_char != '"':
                     return [], IllegalCharError(
                         pos_start, self.pos, "Expected '{}'".format('"'), self.context
                     )
-                tokens.append(Token(T_STRING, value, pos_start=self.pos))
+                tokens.append(tok)
+
+            elif self.current_char == "[":
+                pos_start = self.pos.copy()
                 self.advance()
-                continue
+                tok, error = self.make_array()
+                if error:
+                    return [], error
+                if self.current_char != "]":
+                    return [], IllegalCharError(
+                        pos_start, self.pos, "Expected '{}'".format("]"), self.context
+                    )
+                tokens.append(tok)
+                self.advance()
 
             else:
                 pos_start = self.pos.copy()
@@ -184,4 +195,59 @@ class Lexer:
         while self.current_char is not None and self.current_char != '"':
             string_value += self.current_char
             self.advance()
-        return string_value
+
+        return Token(T_STRING, string_value, pos_start)
+
+    def make_array(self):
+        array = []
+        pos_start = self.pos.copy()
+        while self.current_char is not None and self.current_char != "]":
+            if self.current_char in " \t\n,":
+                self.advance()
+                continue
+
+            elif self.current_char in LETTERS + "@#_$":
+                array.append(self.make_identifier())
+                continue
+
+            elif self.current_char in DIGITS:
+                result, error = self.make_number()
+                if error:
+                    return None, error
+                array.append(result)
+                continue
+
+            elif self.current_char == '"':
+                self.advance()
+                start_pos = self.pos.copy()
+                tok = self.make_string()
+                if self.current_char != '"':
+                    return None, IllegalCharError(
+                        start_pos, self.pos, "Expected '{}'".format('"'), self.context
+                    )
+                array.append(tok)
+
+            elif self.current_char == "[":
+                start_pos = self.pos.copy()
+                self.advance()
+                tok, error = self.make_array()
+                if error:
+                    return None, error
+                if self.current_char != "]":
+                    return None, IllegalCharError(
+                        start_pos, self.pos, "Expected '{}'".format("]"), self.context
+                    )
+                array.append(tok)
+                self.advance()
+
+            else:
+                pos_start = self.pos.copy()
+                return None, IllegalCharError(
+                    pos_start,
+                    self.pos,
+                    "Expected decimal, hexadecimal, string or another array.",
+                    self.context,
+                )
+            self.advance()
+
+        return Token(T_ARRAY, array, pos_start), None

@@ -6,26 +6,30 @@ from base_classes.context import Context
 from base_classes.symbol_table import SymbolTable
 
 
-def start_interpreter(contents, input_file, debug_mode):
+def start_interpreter(contents, input_file, lineno, debug_mode):
     global_symbol_table = SymbolTable()
     context = Context("<module>")
     context.symbol_table = global_symbol_table
-    lexer = Lexer(contents, input_file, context)
+    if lineno is None:
+        lineno = 0
+    lexer = Lexer(contents, input_file, context, lineno)
     tokens, error = lexer.tokenize()
+    if lineno is not None:
+        lineno += 1
     if error:
         print(error.as_string())
         if input_file != "<stdin>":
-            return 1
+            return 1, None
     if len(tokens) == 0:
-        return 0
+        return 0, lineno
     parser = Parser(tokens, context)
     ast, error = parser.parse()
     if error:
         print(error.as_string())
         if input_file != "<stdin>":
-            return 1
+            return 1, None
     if len(ast) == 0:
-        return 0
+        return 0, lineno
 
     interpreter = Interpreter()
     for node in ast:
@@ -33,10 +37,10 @@ def start_interpreter(contents, input_file, debug_mode):
         if result.error:
             print(result.error.as_string())
             if input_file != "<stdin>":
-                return 1
-        if debug_mode and not result.error:
+                return 1, None
+        elif debug_mode:
             print(result.value)
-    return 0
+    return 0, lineno
 
 
 def main(input_file, debug_mode):
@@ -51,16 +55,18 @@ def main(input_file, debug_mode):
         if contents == "":
             print("The file '{}' is empty.".format(input_file))
             return 1
+        lineno = 0
         for line in contents.strip().split("\n"):
-            code = start_interpreter(line, input_file, debug_mode)
+            code, lineno = start_interpreter(line, input_file, lineno, debug_mode)
             if code == 1:
                 return 1
+            lineno += 1
         return 0
     else:
         try:
             while True:
                 contents = input(">> ")
-                code = start_interpreter(contents, input_file, debug_mode)
+                code, lineno = start_interpreter(contents, input_file, None, debug_mode)
                 if code == 1:
                     return 1
         except KeyboardInterrupt:

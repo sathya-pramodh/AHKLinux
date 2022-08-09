@@ -3,12 +3,12 @@ Grammar:
     expression: (KEYWORD:global)* IDENTIFIER ASSIGNMENT expression
               : (KEYWORD:global)* IDENTIFIER
               : term (PLUS|MINUS term)*
-              : term:STRING (CONCAT term:STRING)*
+              : term:STRING (DOT term:STRING)*
     term: factor (MULTIPLY|DIVIDE factor)*
-        : factor:STRING (CONCAT factor:STRING)*
+        : factor:STRING (DOT factor:STRING)*
     factor: (PLUS|MINUS) factor
           : atom
-    atom : DECIMAL|HEXADECIMAL|FLOAT|STRING
+    atom : DECIMAL|HEXADECIMAL|FLOAT|STRING|ARRAY
          : LPAREN expr RPAREN
 """
 from constants import *
@@ -110,17 +110,17 @@ class Parser:
                 T_MINUS,
                 T_MULTIPLY,
                 T_DIVIDE,
-                T_CONCAT,
+                T_DOT,
             ):
                 self.recede()
 
-        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_CONCAT)))
+        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_DOT)))
         if res.error:
             return res
         return res.success(node)
 
     def term(self):
-        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_CONCAT))
+        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_DOT))
 
     def factor(self):
         res = ParseResult()
@@ -172,6 +172,11 @@ class Parser:
                     tok.pos_start, tok.pos_end, "Expected ')'.", self.context
                 )
             )
+
+        elif tok.type == T_ARRAY:
+            self.advance()
+            return res.success(ArrayNode(tok))
+
         return res.failure(
             InvalidSyntaxError(
                 tok.pos_start,

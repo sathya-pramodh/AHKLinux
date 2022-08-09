@@ -179,7 +179,7 @@ class String:
             return None, RunTimeError(
                 self.pos_start,
                 self.pos_end,
-                "Invalid String addition. A String can only be concatenated with itself.",
+                "Invalid String addition. A string can only be concatenated with another string.",
                 self.context,
             )
         return String(self.value + other.value), None
@@ -192,3 +192,37 @@ class String:
 
     def __repr__(self):
         return f"{self.value}"
+
+
+class Array:
+    def __init__(self, value):
+        self.value = value
+        self.set_pos()
+        self.set_context()
+
+    def set_pos(self, pos_start=None, pos_end=None):
+        self.pos_start = pos_start
+        self.pos_end = pos_end
+        return self
+
+    def set_context(self, context=None):
+        self.context = context
+        return self
+
+    def copy(self):
+        copy = Array(self.value)
+        copy.set_pos(self.pos_start, self.pos_end)
+        copy.set_context(self.context)
+        return copy
+
+    def __repr__(self):
+        rep_str = "["
+        count_ = 0
+        for tok in self.value:
+            if count_ != len(self.value) - 1:
+                rep_str += str(tok.__repr__()) + ","
+            else:
+                rep_str += str(tok.__repr__())
+            count_ += 1
+        rep_str += "]"
+        return rep_str

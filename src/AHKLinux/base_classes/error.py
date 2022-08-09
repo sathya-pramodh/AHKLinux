@@ -17,10 +17,15 @@ class Error:
         context = self.context
 
         while context:
-            result += "  File: '{}', line {}, in {}\n".format(
-                pos.filename, pos.line, context.display_name
-            )
-            result += "    {}\n".format(pos.ftext.strip().split("\n")[pos.line - 1])
+            if pos.line == 0:
+                result += "  File : '{}', line {}, in {}\n".format(
+                    pos.filename, 1, context.display_name
+                )
+            else:
+                result += "  File: '{}', line {}, in {}\n".format(
+                    pos.filename, pos.line - 1, context.display_name
+                )
+            result += "    {}\n".format(pos.ftext.strip().split("\n")[0])
             pos = context.parent_entry_pos
             context = context.parent
 
