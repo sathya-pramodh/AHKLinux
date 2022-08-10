@@ -28,6 +28,14 @@ class Interpreter:
         )
 
     def visit_ArrayNode(self, node, context):
+        res = RuntimeResult()
+        compiled_array = []
+        for sub_node in node.tok.value:
+            compiled_node = res.register(self.visit(sub_node, context))
+            if res.error:
+                return res
+            compiled_array.append(compiled_node)
+        node.tok.value = compiled_array
         return RuntimeResult().success(
             Array(node.tok.value)
             .set_context(context)
@@ -100,11 +108,20 @@ class Interpreter:
             if error:
                 return res.failure(error)
             return res.success(result.set_pos(node.pos_start, node.pos_end))
-        elif node.op_tok.type == T_CONCAT:
-            result, error = left.concatenated_to(right)
-            if error:
-                return res.failure(error)
-            return res.success(result.set_pos(node.pos_start, node.pos_end))
+        elif node.op_tok.type == T_DOT:
+            if isinstance(left, String) and isinstance(right, String):
+                result, error = left.concatenated_to(right)
+                if error:
+                    return res.failure(error)
+                return res.success(result.set_pos(node.pos_start, node.pos_end))
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "Invalid String concatenation. A string can only be concatenated with another string.",
+                    context,
+                )
+            )
 
     def visit_UnaryOpNode(self, node, context):
         res = RuntimeResult()

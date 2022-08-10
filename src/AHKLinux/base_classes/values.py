@@ -179,7 +179,7 @@ class String:
             return None, RunTimeError(
                 self.pos_start,
                 self.pos_end,
-                "Invalid String addition. A string can only be concatenated with another string.",
+                "Invalid String concatenation. A string can only be concatenated with another string.",
                 self.context,
             )
         return String(self.value + other.value), None

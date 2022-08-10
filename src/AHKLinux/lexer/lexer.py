@@ -101,6 +101,7 @@ class Lexer:
                     )
                 tokens.append(tok)
                 self.advance()
+                continue
 
             else:
                 pos_start = self.pos.copy()
@@ -205,6 +206,12 @@ class Lexer:
             if self.current_char in " \t\n,":
                 self.advance()
                 continue
+
+            elif self.current_char == ".":
+                array.append(Token(T_DOT, pos_start=self.pos))
+
+            elif self.current_char == "+":
+                array.append(Token(T_PLUS, pos_start=self.pos))
 
             elif self.current_char in LETTERS + "@#_$":
                 array.append(self.make_identifier())

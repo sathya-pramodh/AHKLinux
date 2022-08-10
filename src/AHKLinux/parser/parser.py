@@ -174,7 +174,19 @@ class Parser:
             )
 
         elif tok.type == T_ARRAY:
+            res = ParseResult()
             self.advance()
+            inner_ast = []
+            for sub_tok in tok.value:
+                sub_parser = Parser([sub_tok], self.context)
+                sub_ast, error = sub_parser.parse()
+                if error:
+                    return res.failure(error)
+                if isinstance(sub_ast[0], ParseResult):
+                    inner_ast += [sub_ast[0].node]
+                else:
+                    inner_ast += sub_ast
+            tok.value = inner_ast
             return res.success(ArrayNode(tok))
 
         return res.failure(
