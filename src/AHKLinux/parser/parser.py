@@ -10,6 +10,7 @@ Grammar:
           : atom
     atom : DECIMAL|HEXADECIMAL|FLOAT|STRING|ARRAY
          : LPAREN expr RPAREN
+    array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE
 """
 from constants import *
 from base_classes.nodes import *
@@ -173,21 +174,35 @@ class Parser:
                 )
             )
 
-        elif tok.type == T_ARRAY:
-            res = ParseResult()
+        elif tok.type == T_LSQUARE:
             self.advance()
-            inner_ast = []
-            for sub_tok in tok.value:
-                sub_parser = Parser([sub_tok], self.context)
-                sub_ast, error = sub_parser.parse()
-                if error:
-                    return res.failure(error)
-                if isinstance(sub_ast[0], ParseResult):
-                    inner_ast += [sub_ast[0].node]
-                else:
-                    inner_ast += sub_ast
-            tok.value = inner_ast
-            return res.success(ArrayNode(tok))
+            value_nodes = []
+            if self.current_tok.type == T_RSQUARE:
+                self.advance()
+            else:
+                value_nodes.append(res.register(self.expression()))
+                if res.error:
+                    return res
+
+                while self.current_tok.type == T_COMMA:
+                    self.advance()
+                    value_nodes.append(res.register(self.expression()))
+                    if res.error:
+                        return res
+
+                if self.current_tok.type != T_RSQUARE:
+                    return res.failure(
+                        InvalidSyntaxError(
+                            self.current_tok.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected ',' or ']'",
+                            self.context,
+                        )
+                    )
+                self.advance()
+            return res.success(
+                ArrayNode(value_nodes, tok.pos_start, self.current_tok.pos_end)
+            )
 
         return res.failure(
             InvalidSyntaxError(

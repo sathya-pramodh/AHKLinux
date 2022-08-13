@@ -19,13 +19,13 @@ class StringNode:
 
 
 class ArrayNode:
-    def __init__(self, tok):
-        self.tok = tok
-        self.pos_start = self.tok.pos_start
-        self.pos_end = self.tok.pos_end
+    def __init__(self, value_list, pos_start, pos_end):
+        self.value_list = value_list
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
     def __repr__(self):
-        return f"{self.tok}"
+        return f"{self.value_list}"
 
 
 class BinOpNode:

@@ -32,7 +32,7 @@ class Lexer:
             return [], None
 
         while self.current_char is not None:
-            if self.current_char in " \t\n,":
+            if self.current_char in " \t\n":
                 self.advance()
                 continue
 
@@ -71,6 +71,15 @@ class Lexer:
 
             elif self.current_char == ")":
                 tokens.append(Token(T_RPAREN, pos_start=self.pos))
+
+            elif self.current_char == "[":
+                tokens.append(Token(T_LSQUARE, pos_start=self.pos))
+
+            elif self.current_char == "]":
+                tokens.append(Token(T_RSQUARE, pos_start=self.pos))
+
+            elif self.current_char == ",":
+                tokens.append(Token(T_COMMA, pos_start=self.pos))
 
             elif self.current_char in DIGITS:
                 result, error = self.make_number()

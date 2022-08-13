@@ -29,17 +29,14 @@ class Interpreter:
 
     def visit_ArrayNode(self, node, context):
         res = RuntimeResult()
-        compiled_array = []
-        for sub_node in node.tok.value:
-            compiled_node = res.register(self.visit(sub_node, context))
+        elements = []
+
+        for element_node in node.value_list:
+            elements.append(res.register(self.visit(element_node, context)))
             if res.error:
                 return res
-            compiled_array.append(compiled_node)
-        node.tok.value = compiled_array
-        return RuntimeResult().success(
-            Array(node.tok.value)
-            .set_context(context)
-            .set_pos(node.pos_start, node.pos_end)
+        return res.success(
+            Array(elements).set_context(context).set_pos(node.pos_start, node.pos_end)
         )
 
     def visit_VarAccessNode(self, node, context):
