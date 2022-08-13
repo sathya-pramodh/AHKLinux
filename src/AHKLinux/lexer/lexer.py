@@ -59,12 +59,14 @@ class Lexer:
                 next_char = self.get_next_char(self.pos.idx)
                 if next_char is not None and next_char == "=":
                     self.advance()
+                    tokens.append(Token(T_ASSIGNMENT, pos_start=self.pos))
+                elif next_char is not None:
+                    tokens.append(Token(T_COLON, pos_start=self.pos))
                 else:
                     char = self.current_char
                     return [], IllegalCharError(
                         self.pos, self.pos, "'{}'".format(char), self.context
                     )
-                tokens.append(Token(T_ASSIGNMENT, pos_start=self.pos))
 
             elif self.current_char == "(":
                 tokens.append(Token(T_LPAREN, pos_start=self.pos))
@@ -77,6 +79,12 @@ class Lexer:
 
             elif self.current_char == "]":
                 tokens.append(Token(T_RSQUARE, pos_start=self.pos))
+
+            elif self.current_char == "{":
+                tokens.append(Token(T_LCURVE, pos_start=self.pos))
+
+            elif self.current_char == "}":
+                tokens.append(Token(T_RCURVE, pos_start=self.pos))
 
             elif self.current_char == ",":
                 tokens.append(Token(T_COMMA, pos_start=self.pos))

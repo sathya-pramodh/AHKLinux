@@ -28,6 +28,16 @@ class ArrayNode:
         return f"{self.value_list}"
 
 
+class ObjectNode:
+    def __init__(self, value_dict, pos_start, pos_end):
+        self.value_dict = value_dict
+        self.pos_start = pos_start
+        self.pos_end = pos_end
+
+    def __repr__(self):
+        return f"{self.value_dict}"
+
+
 class BinOpNode:
     def __init__(self, left_node, op_tok, right_node):
         self.left_node = left_node

@@ -10,7 +10,10 @@ Grammar:
           : atom
     atom : DECIMAL|HEXADECIMAL|FLOAT|STRING|ARRAY
          : LPAREN expr RPAREN
+         : array-expr
+         : object-expr
     array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE
+    object-expr : LCURVE (expr COLON expr (COMMA expr COLON expr)*)? RCURVE
 """
 from constants import *
 from base_classes.nodes import *
@@ -113,6 +116,9 @@ class Parser:
                 T_DIVIDE,
                 T_DOT,
                 T_COMMA,
+                T_RSQUARE,
+                T_RCURVE,
+                T_COLON,
             ):
                 self.recede()
 
@@ -205,11 +211,50 @@ class Parser:
                 ArrayNode(value_nodes, tok.pos_start, self.current_tok.pos_end)
             )
 
+        elif tok.type == T_LCURVE:
+            self.advance()
+            value_nodes = {}
+            if self.current_tok.type == T_RCURVE:
+                self.advance()
+            else:
+                while self.current_tok.type != T_RCURVE:
+                    key = res.register(self.expression())
+                    if res.error:
+                        return res
+
+                    if self.current_tok.type != T_COLON:
+                        return res.failure(
+                            InvalidSyntaxError(
+                                self.current_tok.pos_start,
+                                self.current_tok.pos_end,
+                                "Expected ':'",
+                                self.context,
+                            )
+                        )
+                    self.advance()
+                    value = res.register(self.expression())
+                    value_nodes[key] = value
+                    if self.current_tok.type == T_COMMA:
+                        self.advance()
+                    elif self.current_tok.type != T_RCURVE:
+                        return res.failure(
+                            InvalidSyntaxError(
+                                tok.pos_start,
+                                self.current_tok.pos_end,
+                                "Expected ',' or '}'.",
+                                self.context,
+                            )
+                        )
+                self.advance()
+            return res.success(
+                ObjectNode(value_nodes, tok.pos_start, self.current_tok.pos_end)
+            )
+
         return res.failure(
             InvalidSyntaxError(
                 tok.pos_start,
                 tok.pos_end,
-                "Expected int, float, hexadecimal or string.",
+                "Expected int, float, hexadecimal, string, array or an object",
                 self.context,
             )
         )

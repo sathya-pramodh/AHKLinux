@@ -39,6 +39,22 @@ class Interpreter:
             Array(elements).set_context(context).set_pos(node.pos_start, node.pos_end)
         )
 
+    def visit_ObjectNode(self, node, context):
+        res = RuntimeResult()
+        elements = {}
+
+        for key, value in node.value_dict.items():
+            compiled_key = res.register(self.visit(key, context))
+            if res.error:
+                return res
+            compiled_value = res.register(self.visit(value, context))
+            if res.error:
+                return res
+            elements[compiled_key] = compiled_value
+        return res.success(
+            Object(elements).set_context(context).set_pos(node.pos_start, node.pos_end)
+        )
+
     def visit_VarAccessNode(self, node, context):
         res = RuntimeResult()
         var_name = node.var_name_tok.value

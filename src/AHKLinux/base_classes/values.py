@@ -226,3 +226,37 @@ class Array:
             count_ += 1
         rep_str += "]"
         return rep_str
+
+
+class Object:
+    def __init__(self, value):
+        self.value = value
+        self.set_pos()
+        self.set_context()
+
+    def set_pos(self, pos_start=None, pos_end=None):
+        self.pos_start = pos_start
+        self.pos_end = pos_end
+        return self
+
+    def set_context(self, context=None):
+        self.context = context
+        return self
+
+    def copy(self):
+        copy = Object(self.value)
+        copy.set_pos(self.pos_start, self.pos_end)
+        copy.set_context(self.context)
+        return copy
+
+    def __repr__(self):
+        rep_str = "{"
+        count_ = 0
+        for key, value in self.value.items():
+            if count_ != len(self.value) - 1:
+                rep_str += str(key.__repr__()) + ":" + str(value.__repr__()) + ","
+            else:
+                rep_str += str(key.__repr__()) + ":" + str(value.__repr__())
+            count_ += 1
+        rep_str += "}"
+        return rep_str
