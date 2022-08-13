@@ -112,6 +112,7 @@ class Parser:
                 T_MULTIPLY,
                 T_DIVIDE,
                 T_DOT,
+                T_COMMA,
             ):
                 self.recede()
 
