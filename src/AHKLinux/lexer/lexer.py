@@ -106,20 +106,6 @@ class Lexer:
                     )
                 tokens.append(tok)
 
-            elif self.current_char == "[":
-                pos_start = self.pos.copy()
-                self.advance()
-                tok, error = self.make_array()
-                if error:
-                    return [], error
-                if self.current_char != "]":
-                    return [], IllegalCharError(
-                        pos_start, self.pos, "Expected '{}'".format("]"), self.context
-                    )
-                tokens.append(tok)
-                self.advance()
-                continue
-
             else:
                 pos_start = self.pos.copy()
                 char = self.current_char
@@ -215,63 +201,3 @@ class Lexer:
             self.advance()
 
         return Token(T_STRING, string_value, pos_start)
-
-    def make_array(self):
-        array = []
-        pos_start = self.pos.copy()
-        while self.current_char is not None and self.current_char != "]":
-            if self.current_char in " \t\n,":
-                self.advance()
-                continue
-
-            elif self.current_char == ".":
-                array.append(Token(T_DOT, pos_start=self.pos))
-
-            elif self.current_char == "+":
-                array.append(Token(T_PLUS, pos_start=self.pos))
-
-            elif self.current_char in LETTERS + "@#_$":
-                array.append(self.make_identifier())
-                continue
-
-            elif self.current_char in DIGITS:
-                result, error = self.make_number()
-                if error:
-                    return None, error
-                array.append(result)
-                continue
-
-            elif self.current_char == '"':
-                self.advance()
-                start_pos = self.pos.copy()
-                tok = self.make_string()
-                if self.current_char != '"':
-                    return None, IllegalCharError(
-                        start_pos, self.pos, "Expected '{}'".format('"'), self.context
-                    )
-                array.append(tok)
-
-            elif self.current_char == "[":
-                start_pos = self.pos.copy()
-                self.advance()
-                tok, error = self.make_array()
-                if error:
-                    return None, error
-                if self.current_char != "]":
-                    return None, IllegalCharError(
-                        start_pos, self.pos, "Expected '{}'".format("]"), self.context
-                    )
-                array.append(tok)
-                self.advance()
-
-            else:
-                pos_start = self.pos.copy()
-                return None, IllegalCharError(
-                    pos_start,
-                    self.pos,
-                    "Expected decimal, hexadecimal, string or another array.",
-                    self.context,
-                )
-            self.advance()
-
-        return Token(T_ARRAY, array, pos_start), None

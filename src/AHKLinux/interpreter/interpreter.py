@@ -14,18 +14,20 @@ class Interpreter:
         raise Exception("No visit_{} method defined.".format(type(node).__name__))
 
     def visit_NumberNode(self, node, context):
-        return RuntimeResult().success(
+        number = (
             Number(node.tok.value, node.tok.type)
             .set_context(context)
             .set_pos(node.pos_start, node.pos_end)
         )
+        return RuntimeResult().success(number)
 
     def visit_StringNode(self, node, context):
-        return RuntimeResult().success(
+        string = (
             String(node.tok.value)
             .set_context(context)
             .set_pos(node.pos_start, node.pos_end)
         )
+        return RuntimeResult().success(string)
 
     def visit_ArrayNode(self, node, context):
         res = RuntimeResult()
@@ -35,25 +37,12 @@ class Interpreter:
             elements.append(res.register(self.visit(element_node, context)))
             if res.error:
                 return res
-        return res.success(
-            Array(elements).set_context(context).set_pos(node.pos_start, node.pos_end)
-        )
+        arr = Array(elements).set_context(context).set_pos(node.pos_start, node.pos_end)
+        return res.success(arr)
 
     def visit_ObjectNode(self, node, context):
-        res = RuntimeResult()
-        elements = {}
-
-        for key, value in node.value_dict.items():
-            compiled_key = res.register(self.visit(key, context))
-            if res.error:
-                return res
-            compiled_value = res.register(self.visit(value, context))
-            if res.error:
-                return res
-            elements[compiled_key] = compiled_value
-        return res.success(
-            Object(elements).set_context(context).set_pos(node.pos_start, node.pos_end)
-        )
+        obj = Object({}).set_context(context).set_pos(node.pos_start, node.pos_end)
+        return RuntimeResult().success(obj)
 
     def visit_VarAccessNode(self, node, context):
         res = RuntimeResult()
@@ -89,7 +78,9 @@ class Interpreter:
             context.symbol_table.set(var_name, var_value, global_=True)
         else:
             context.symbol_table.set(var_name, var_value)
-        return res.success(var_value)
+        return res.success(
+            "'{}' has been assigned the value {}.".format(var_name, var_value)
+        )
 
     def visit_BinOpNode(self, node, context):
         res = RuntimeResult()
@@ -104,29 +95,34 @@ class Interpreter:
             result, error = left.added_to(right)
             if error:
                 return res.failure(error)
-            return res.success(result.set_pos(node.pos_start, node.pos_end))
+            result.set_pos(node.pos_start, node.pos_end)
+            return res.success(result)
         elif node.op_tok.type == T_MINUS:
             result, error = left.subtracted_by(right)
             if error:
                 return res.failure(error)
-            return res.success(result.set_pos(node.pos_start, node.pos_end))
+            result.set_pos(node.pos_start, node.pos_end)
+            return res.success(result)
         elif node.op_tok.type == T_MULTIPLY:
             result, error = left.multiplied_by(right)
             if error:
                 return res.failure(error)
-            return res.success(result.set_pos(node.pos_start, node.pos_end))
+            result.set_pos(node.pos_start, node.pos_end)
+            return res.success(result)
         elif node.op_tok.type == T_DIVIDE:
             result, error = left.divided_by(right)
 
             if error:
                 return res.failure(error)
-            return res.success(result.set_pos(node.pos_start, node.pos_end))
+            result.set_pos(node.pos_start, node.pos_end)
+            return res.success(result)
         elif node.op_tok.type == T_DOT:
             if isinstance(left, String) and isinstance(right, String):
                 result, error = left.concatenated_to(right)
-                if error:
+                if error or result is None:
                     return res.failure(error)
-                return res.success(result.set_pos(node.pos_start, node.pos_end))
+                result.set_pos(node.pos_start, node.pos_end)
+                return res.success(result)
             return res.failure(
                 RunTimeError(
                     node.pos_start,
@@ -151,4 +147,36 @@ class Interpreter:
                 number, error = number.multiplied_by(Number(-1, T_DECIMAL))
                 if error:
                     return res.failure(error)
-        return res.success(number.set_pos(node.pos_start, node.pos_end))
+        number.set_pos(node.pos_start, node.pos_end)
+        return res.success(number)
+
+    def visit_ObjectAccessNode(self, node, context):
+        res = RuntimeResult()
+        object_name = self.visit(node.object_name, context)
+        if object_name.error:
+            return res.failure(object_name.error)
+        result = object_name.value.get(node.key.value)
+        if result is None:
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "Key '{}' not found in object.".format(node.key.value),
+                    context,
+                )
+            )
+        return res.success(result)
+
+    def visit_ObjectAssignNode(self, node, context):
+        res = RuntimeResult()
+        object_name = self.visit(node.object_name, context)
+        value = self.visit(node.value, context)
+        if value.error:
+            return res.failure(value.error)
+        object_name.value.set(str(node.key.value), value.value)
+        object_name.value.set_pos(node.pos_start, node.pos_end)
+        return res.success(
+            "Key '{}' in object {} has been assigned the value {}.".format(
+                node.key, object_name.value, value.value
+            )
+        )

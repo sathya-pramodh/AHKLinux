@@ -3,9 +3,11 @@ Grammar:
     expression: (KEYWORD:global)* IDENTIFIER ASSIGNMENT expression
               : (KEYWORD:global)* IDENTIFIER
               : term (PLUS|MINUS term)*
-              : term:STRING (DOT term:STRING)*
+              : term:STRING (DOT term:STRING)* (ASSIGNMENT expression)*
+              : term:IDENTIFIER (DOT term:IDENTIFIER)*
     term: factor (MULTIPLY|DIVIDE factor)*
         : factor:STRING (DOT factor:STRING)*
+        : factor:IDENTIFIER (DOT factor:IDENTIFIER)*
     factor: (PLUS|MINUS) factor
           : atom
     atom : DECIMAL|HEXADECIMAL|FLOAT|STRING|ARRAY
@@ -13,7 +15,7 @@ Grammar:
          : array-expr
          : object-expr
     array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE
-    object-expr : LCURVE (expr COLON expr (COMMA expr COLON expr)*)? RCURVE
+    object-expr : LCURVE RCURVE
 """
 from constants import *
 from base_classes.nodes import *
@@ -109,12 +111,40 @@ class Parser:
                 if res.error:
                     return res
                 return res.success(VarAssignNode(var_name, expr))
+
+            elif self.current_tok.type == T_DOT:
+                self.advance()
+                if self.current_tok.type == T_IDENTIFIER:
+                    key_tok = self.current_tok
+                    self.advance()
+                    if self.current_tok.type == T_ASSIGNMENT:
+                        self.advance()
+                        expr = res.register(self.expression())
+                        if res.error:
+                            return res
+                        return res.success(
+                            ObjectAssignNode(VarAccessNode(var_name), key_tok, expr)
+                        )
+                    else:
+                        self.recede()
+                        self.recede()
+                        self.recede()
+
+                else:
+                    return res.failure(
+                        InvalidSyntaxError(
+                            self.current_tok.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected an identifier after '.'.",
+                            self.context,
+                        )
+                    )
+
             elif self.current_tok.type in (
                 T_PLUS,
                 T_MINUS,
                 T_MULTIPLY,
                 T_DIVIDE,
-                T_DOT,
                 T_COMMA,
                 T_RSQUARE,
                 T_RCURVE,
@@ -165,6 +195,21 @@ class Parser:
 
         elif tok.type == T_IDENTIFIER:
             self.advance()
+            if self.current_tok.type == T_DOT:
+                self.advance()
+                if self.current_tok.type == T_IDENTIFIER:
+                    key = self.current_tok
+                    self.advance()
+                    return res.success(ObjectAccessNode(VarAccessNode(tok), key))
+                else:
+                    return res.failure(
+                        InvalidSyntaxError(
+                            tok.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected a key name after '.'.",
+                            self.context,
+                        )
+                    )
             return res.success(VarAccessNode(tok))
 
         elif tok.type == T_LPAREN:
@@ -217,35 +262,14 @@ class Parser:
             if self.current_tok.type == T_RCURVE:
                 self.advance()
             else:
-                while self.current_tok.type != T_RCURVE:
-                    key = res.register(self.expression())
-                    if res.error:
-                        return res
-
-                    if self.current_tok.type != T_COLON:
-                        return res.failure(
-                            InvalidSyntaxError(
-                                self.current_tok.pos_start,
-                                self.current_tok.pos_end,
-                                "Expected ':'",
-                                self.context,
-                            )
-                        )
-                    self.advance()
-                    value = res.register(self.expression())
-                    value_nodes[key] = value
-                    if self.current_tok.type == T_COMMA:
-                        self.advance()
-                    elif self.current_tok.type != T_RCURVE:
-                        return res.failure(
-                            InvalidSyntaxError(
-                                tok.pos_start,
-                                self.current_tok.pos_end,
-                                "Expected ',' or '}'.",
-                                self.context,
-                            )
-                        )
-                self.advance()
+                return res.failure(
+                    InvalidSyntaxError(
+                        tok.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '}'.",
+                        self.context,
+                    )
+                )
             return res.success(
                 ObjectNode(value_nodes, tok.pos_start, self.current_tok.pos_end)
             )

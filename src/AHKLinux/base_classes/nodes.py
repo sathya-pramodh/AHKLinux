@@ -82,3 +82,26 @@ class VarAccessNode:
 
     def __repr__(self):
         return f"{self.var_name_tok}"
+
+
+class ObjectAccessNode:
+    def __init__(self, object_name, key):
+        self.object_name = object_name
+        self.pos_start = self.object_name.pos_start
+        self.pos_end = self.object_name.pos_end
+        self.key = key
+
+    def __repr__(self):
+        return f"{self.object_name}.{self.key}"
+
+
+class ObjectAssignNode:
+    def __init__(self, object_name, key, value):
+        self.object_name = object_name
+        self.pos_start = self.object_name.pos_start
+        self.pos_end = self.object_name.pos_end
+        self.key = key
+        self.value = value
+
+    def __repr__(self):
+        return f"{self.object_name}.{self.key} = {self.value}"

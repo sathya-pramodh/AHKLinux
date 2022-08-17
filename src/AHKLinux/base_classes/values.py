@@ -243,6 +243,13 @@ class Object:
         self.context = context
         return self
 
+    def set(self, key, value):
+        if isinstance(self.value, dict):
+            self.value[key] = value
+
+    def get(self, key):
+        return self.value.get(key, None)
+
     def copy(self):
         copy = Object(self.value)
         copy.set_pos(self.pos_start, self.pos_end)
@@ -252,11 +259,12 @@ class Object:
     def __repr__(self):
         rep_str = "{"
         count_ = 0
-        for key, value in self.value.items():
-            if count_ != len(self.value) - 1:
-                rep_str += str(key.__repr__()) + ":" + str(value.__repr__()) + ","
-            else:
-                rep_str += str(key.__repr__()) + ":" + str(value.__repr__())
-            count_ += 1
-        rep_str += "}"
-        return rep_str
+        if isinstance(self.value, dict):
+            for key, value in self.value.items():
+                if count_ != len(self.value) - 1:
+                    rep_str += str(key.__repr__()) + ":" + str(value.__repr__()) + ","
+                else:
+                    rep_str += str(key.__repr__()) + ":" + str(value.__repr__())
+                count_ += 1
+            rep_str += "}"
+            return rep_str

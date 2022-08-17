@@ -40,6 +40,8 @@ def start_interpreter(contents, input_file, lineno, debug_mode):
                 return 1, None
         elif debug_mode:
             print(result.value)
+        elif not debug_mode and not isinstance(result.value, str):
+            print(result.value)
     return 0, lineno
 
 
