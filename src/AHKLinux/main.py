@@ -24,7 +24,6 @@ def start_interpreter(contents, input_file, lineno, debug_mode):
         return 0, lineno
     parser = Parser(tokens, context)
     ast, error = parser.parse()
-    print(ast)
     if error:
         print(error.as_string())
         if input_file != "<stdin>":
