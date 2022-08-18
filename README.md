@@ -14,7 +14,7 @@ python3 init.py
 a := 10
 a
 ```
-    - This would output:
+  - This would output:
 ```
 'a' has been assigned the value 10.
 10
