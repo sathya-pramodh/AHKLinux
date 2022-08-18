@@ -103,6 +103,7 @@ class Interpreter:
                 return res.failure(error)
             result.set_pos(node.pos_start, node.pos_end)
             return res.success(result)
+
         elif node.op_tok.type == T_MULTIPLY:
             result, error = left.multiplied_by(right)
             if error:
@@ -117,20 +118,11 @@ class Interpreter:
             result.set_pos(node.pos_start, node.pos_end)
             return res.success(result)
         elif node.op_tok.type == T_DOT:
-            if isinstance(left, String) and isinstance(right, String):
-                result, error = left.concatenated_to(right)
-                if error or result is None:
-                    return res.failure(error)
-                result.set_pos(node.pos_start, node.pos_end)
-                return res.success(result)
-            return res.failure(
-                RunTimeError(
-                    node.pos_start,
-                    node.pos_end,
-                    "Invalid String concatenation. A string can only be concatenated with another string.",
-                    context,
-                )
-            )
+            result, error = left.concatenated_to(right)
+            if error:
+                return res.failure(error)
+            result.set_pos(node.pos_start, node.pos_end)
+            return res.success(result)
 
     def visit_UnaryOpNode(self, node, context):
         res = RuntimeResult()
@@ -152,29 +144,68 @@ class Interpreter:
 
     def visit_ObjectAccessNode(self, node, context):
         res = RuntimeResult()
-        object_name = self.visit(node.object_name, context)
-        if object_name.error:
-            return res.failure(object_name.error)
-        result = object_name.value.get(node.key.value)
-        if result is None:
+        object_name = res.register(self.visit(node.object_name, context))
+        if res.error:
+            return res
+        if isinstance(object_name, String):
+            second_string = res.register(self.visit(node.key, context))
+            if res.error:
+                return res
+            if isinstance(second_string, String):
+                string = String(object_name.value + second_string.value).set_pos(
+                    node.pos_start, node.pos_end
+                )
+                return res.success(string)
             return res.failure(
                 RunTimeError(
                     node.pos_start,
                     node.pos_end,
-                    "Key '{}' not found in object.".format(node.key.value),
+                    "{} is not a string.".format(node.key),
                     context,
                 )
             )
-        return res.success(result)
+        elif isinstance(object_name, Object):
+            result = object_name.get(node.key.var_name_tok.value)
+            if result is None:
+                return res.failure(
+                    RunTimeError(
+                        node.pos_start,
+                        node.pos_end,
+                        "Key '{}' not found in object.".format(
+                            node.key.var_name_tok.value
+                        ),
+                        context,
+                    )
+                )
+            return res.success(result)
+        return res.failure(
+            RunTimeError(
+                node.pos_start,
+                node.pos_end,
+                "Expected concatenation of two strings or an object access.",
+                context,
+            )
+        )
 
     def visit_ObjectAssignNode(self, node, context):
         res = RuntimeResult()
-        object_name = self.visit(node.object_name, context)
-        value = self.visit(node.value, context)
-        if value.error:
-            return res.failure(value.error)
-        object_name.value.set(str(node.key.value), value.value)
-        object_name.value.set_pos(node.pos_start, node.pos_end)
+        object_name = res.register(self.visit(node.object_name, context))
+        if res.error:
+            return res
+        value = res.register(self.visit(node.value, context))
+        if res.error:
+            return res
+        if isinstance(object_name, String):
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "A String concatenation cannot be assigned to anything.",
+                    context,
+                )
+            )
+        object_name.set(str(node.key.var_name_tok.value), value)
+        object_name.set_pos(node.pos_start, node.pos_end)
         return res.success(
             "Key '{}' in object {} has been assigned the value {}.".format(
                 node.key, object_name.value, value.value

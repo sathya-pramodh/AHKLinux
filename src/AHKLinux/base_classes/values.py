@@ -191,7 +191,7 @@ class String:
         return copy
 
     def __repr__(self):
-        return f"{self.value}"
+        return f"'{self.value}'"
 
 
 class Array:
@@ -244,8 +244,7 @@ class Object:
         return self
 
     def set(self, key, value):
-        if isinstance(self.value, dict):
-            self.value[key] = value
+        self.value[key] = value
 
     def get(self, key):
         return self.value.get(key, None)

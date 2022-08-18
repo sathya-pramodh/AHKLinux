@@ -115,7 +115,7 @@ class Parser:
             elif self.current_tok.type == T_DOT:
                 self.advance()
                 if self.current_tok.type == T_IDENTIFIER:
-                    key_tok = self.current_tok
+                    key = self.current_tok
                     self.advance()
                     if self.current_tok.type == T_ASSIGNMENT:
                         self.advance()
@@ -123,22 +123,17 @@ class Parser:
                         if res.error:
                             return res
                         return res.success(
-                            ObjectAssignNode(VarAccessNode(var_name), key_tok, expr)
+                            ObjectAssignNode(
+                                VarAccessNode(var_name), VarAccessNode(key), expr
+                            )
                         )
                     else:
                         self.recede()
                         self.recede()
                         self.recede()
-
                 else:
-                    return res.failure(
-                        InvalidSyntaxError(
-                            self.current_tok.pos_start,
-                            self.current_tok.pos_end,
-                            "Expected an identifier after '.'.",
-                            self.context,
-                        )
-                    )
+                    self.recede()
+                    self.recede()
 
             elif self.current_tok.type in (
                 T_PLUS,
@@ -199,9 +194,17 @@ class Parser:
                 self.advance()
                 if self.current_tok.type == T_IDENTIFIER:
                     key = self.current_tok
+                    return res.success(
+                        ObjectAccessNode(VarAccessNode(tok), VarAccessNode(key))
+                    )
+                elif self.current_tok.type == T_STRING:
+                    key = self.current_tok
                     self.advance()
-                    return res.success(ObjectAccessNode(VarAccessNode(tok), key))
+                    return res.success(
+                        ObjectAccessNode(VarAccessNode(tok), StringNode(key))
+                    )
                 else:
+                    self.advance()
                     return res.failure(
                         InvalidSyntaxError(
                             tok.pos_start,
