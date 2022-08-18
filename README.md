@@ -10,15 +10,15 @@ python3 init.py
 ### Debug Mode
 - Description
   - Prints out debug-friendly steps that the interpreter has taken. Example:
-```
-a := 10
-a
-```
-  - This would output:
-```
-'a' has been assigned the value 10.
-10
-```
+  ```
+  a := 10
+  a
+  ```
+   - This would output:
+  ```
+  'a' has been assigned the value 10.
+  10
+  ```
 - Option trigger
 ```
 python3 init.py -d
