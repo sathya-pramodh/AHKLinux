@@ -1,4 +1,4 @@
-from constants import *
+from constants import T_DOT
 
 
 class NumberNode:
