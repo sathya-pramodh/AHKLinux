@@ -1,3 +1,6 @@
+from constants import *
+
+
 class NumberNode:
     def __init__(self, tok):
         self.tok = tok
@@ -47,7 +50,9 @@ class BinOpNode:
         self.pos_end = self.right_node.pos_end
 
     def __repr__(self):
-        return f"({self.left_node}, {self.op_tok}, {self.right_node})"
+        if self.op_tok.type == T_DOT:
+            return f"{self.left_node}.{self.right_node}"
+        return f"{self.left_node}{self.op_tok.type}{self.right_node}"
 
 
 class UnaryOpNode:

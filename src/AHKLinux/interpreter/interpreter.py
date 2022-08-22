@@ -178,7 +178,7 @@ class Interpreter:
             RunTimeError(
                 node.pos_start,
                 node.pos_end,
-                "{} is not an object.".format(compiled_access_node),
+                "{} is not an Associative Array.".format(node.access_node),
                 context,
             )
         )

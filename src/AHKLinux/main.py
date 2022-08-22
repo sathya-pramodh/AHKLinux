@@ -14,8 +14,6 @@ def start_interpreter(contents, input_file, lineno, debug_mode):
         lineno = 0
     lexer = Lexer(contents, input_file, context, lineno)
     tokens, error = lexer.tokenize()
-    if lineno is not None:
-        lineno += 1
     if error:
         print(error.as_string())
         if input_file != "<stdin>":
@@ -59,10 +57,10 @@ def main(input_file, debug_mode):
             return 1
         lineno = 0
         for line in contents.strip().split("\n"):
+            lineno += 1
             code, lineno = start_interpreter(line, input_file, lineno, debug_mode)
             if code == 1:
                 return 1
-            lineno += 1
         return 0
     else:
         try:
