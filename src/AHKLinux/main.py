@@ -11,7 +11,7 @@ def start_interpreter(contents, input_file, lineno, debug_mode):
     context = Context("<module>")
     context.symbol_table = global_symbol_table
     if lineno is None:
-        lineno = 0
+        lineno = 1
     lexer = Lexer(contents, input_file, context, lineno)
     tokens, error = lexer.tokenize()
     if error:

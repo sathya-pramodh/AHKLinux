@@ -258,6 +258,7 @@ class AssociativeArray:
         for key_ in self.value.keys():
             if key_.value == key.value:
                 self.value[key_] = value
+                break
         else:
             self.value[key] = value
 

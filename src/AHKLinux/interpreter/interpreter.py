@@ -158,6 +158,16 @@ class Interpreter:
                     return res.failure(error)
                 result.set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "'{}' is not a string or an associative array.".format(
+                        node.left_node
+                    ),
+                    context,
+                )
+            )
 
     def visit_AssociativeArrayAssignNode(self, node, context):
         res = RuntimeResult()
