@@ -28,7 +28,7 @@ class ArrayNode:
         return f"{self.value_list}"
 
 
-class ObjectNode:
+class AssociativeArrayNode:
     def __init__(self, value_dict, pos_start, pos_end):
         self.value_dict = value_dict
         self.pos_start = pos_start
@@ -62,16 +62,16 @@ class UnaryOpNode:
 
 
 class VarAssignNode:
-    def __init__(self, var_name_tok, value_node, scope="local"):
-        self.var_name_tok = var_name_tok
+    def __init__(self, var_name, value_node, scope="local"):
+        self.var_name = var_name
         self.value_node = value_node
         self.scope = scope
 
-        self.pos_start = self.var_name_tok.pos_start
+        self.pos_start = self.var_name.pos_start
         self.pos_end = self.value_node.pos_end
 
     def __repr__(self):
-        return f"{self.var_name_tok}:{self.value_node}"
+        return f"{self.var_name}:{self.value_node}"
 
 
 class VarAccessNode:
@@ -84,24 +84,14 @@ class VarAccessNode:
         return f"{self.var_name_tok}"
 
 
-class ObjectAccessNode:
-    def __init__(self, object_name, key):
-        self.object_name = object_name
-        self.pos_start = self.object_name.pos_start
-        self.pos_end = self.object_name.pos_end
+class AssociativeArrayAssignNode:
+    def __init__(self, access_node, key, value_node):
+        self.access_node = access_node
         self.key = key
-
-    def __repr__(self):
-        return f"{self.object_name}.{self.key}"
-
-
-class ObjectAssignNode:
-    def __init__(self, object_name, key, value):
-        self.object_name = object_name
-        self.pos_start = self.object_name.pos_start
-        self.pos_end = self.object_name.pos_end
-        self.key = key
-        self.value = value
-
-    def __repr__(self):
-        return f"{self.object_name}.{self.key} = {self.value}"
+        self.value_node = value_node
+        if isinstance(access_node, VarAccessNode):
+            self.pos_start = self.access_node.pos_start
+            self.pos_end = self.access_node.pos_end
+        else:
+            self.pos_start = self.access_node.left_node.pos_start
+            self.pos_end = self.access_node.right_node.pos_end

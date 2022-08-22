@@ -40,8 +40,23 @@ class Interpreter:
         arr = Array(elements).set_context(context).set_pos(node.pos_start, node.pos_end)
         return res.success(arr)
 
-    def visit_ObjectNode(self, node, context):
-        obj = Object({}).set_context(context).set_pos(node.pos_start, node.pos_end)
+    def visit_AssociativeArrayNode(self, node, context):
+        res = RuntimeResult()
+        compiled_arr = {}
+
+        for key_node, value_node in node.value_dict.items():
+            compiled_key = res.register(self.visit(key_node, context))
+            if res.error:
+                return res
+            compiled_value = res.register(self.visit(value_node, context))
+            if res.error:
+                return res
+            compiled_arr[compiled_key] = compiled_value
+        obj = (
+            AssociativeArray(compiled_arr)
+            .set_context(context)
+            .set_pos(node.pos_start, node.pos_end)
+        )
         return RuntimeResult().success(obj)
 
     def visit_VarAccessNode(self, node, context):
@@ -61,12 +76,12 @@ class Interpreter:
                     context,
                 )
             )
-        var_value = var_value.copy().set_pos(node.pos_start, node.pos_end)
+        var_value = var_value.set_context(context).set_pos(node.pos_start, node.pos_end)
         return res.success(var_value)
 
     def visit_VarAssignNode(self, node, context):
         res = RuntimeResult()
-        var_name = node.var_name_tok.value
+        var_name = node.var_name.value
         var_value = res.register(self.visit(node.value_node, context))
         if res.error:
             return res
@@ -87,17 +102,20 @@ class Interpreter:
         left = res.register(self.visit(node.left_node, context))
         if res.error:
             return res
-        right = res.register(self.visit(node.right_node, context))
-        if res.error:
-            return res
 
         if node.op_tok.type == T_PLUS:
+            right = res.register(self.visit(node.right_node, context))
+            if res.error:
+                return res
             result, error = left.added_to(right)
             if error:
                 return res.failure(error)
             result.set_pos(node.pos_start, node.pos_end)
             return res.success(result)
         elif node.op_tok.type == T_MINUS:
+            right = res.register(self.visit(node.right_node, context))
+            if res.error:
+                return res
             result, error = left.subtracted_by(right)
             if error:
                 return res.failure(error)
@@ -105,12 +123,18 @@ class Interpreter:
             return res.success(result)
 
         elif node.op_tok.type == T_MULTIPLY:
+            right = res.register(self.visit(node.right_node, context))
+            if res.error:
+                return res
             result, error = left.multiplied_by(right)
             if error:
                 return res.failure(error)
             result.set_pos(node.pos_start, node.pos_end)
             return res.success(result)
         elif node.op_tok.type == T_DIVIDE:
+            right = res.register(self.visit(node.right_node, context))
+            if res.error:
+                return res
             result, error = left.divided_by(right)
 
             if error:
@@ -118,11 +142,46 @@ class Interpreter:
             result.set_pos(node.pos_start, node.pos_end)
             return res.success(result)
         elif node.op_tok.type == T_DOT:
-            result, error = left.concatenated_to(right)
-            if error:
-                return res.failure(error)
-            result.set_pos(node.pos_start, node.pos_end)
-            return res.success(result)
+            if getattr(left, "concatenated_to", None):
+                right = res.register(self.visit(node.right_node, context))
+                if res.error:
+                    return res
+                result, error = left.concatenated_to(right)
+                if error:
+                    return res.failure(error)
+                result.set_pos(node.pos_start, node.pos_end)
+                return res.success(result)
+            elif getattr(left, "access", None):
+                right = node.right_node.var_name_tok.value
+                result, error = left.access(right)
+                if error:
+                    return res.failure(error)
+                result.set_pos(node.pos_start, node.pos_end)
+                return res.success(result)
+
+    def visit_AssociativeArrayAssignNode(self, node, context):
+        res = RuntimeResult()
+        compiled_access_node = res.register(self.visit(node.access_node, context))
+        if res.error:
+            return res
+        compiled_value = res.register(self.visit(node.value_node, context))
+        if res.error:
+            return res
+        if isinstance(compiled_access_node, AssociativeArray):
+            compiled_access_node.set(node.key, compiled_value)
+            return res.success(
+                "Key '{}' was assigned the value {}".format(
+                    node.key.value, compiled_value
+                )
+            )
+        return res.failure(
+            RunTimeError(
+                node.pos_start,
+                node.pos_end,
+                "{} is not an object.".format(compiled_access_node),
+                context,
+            )
+        )
 
     def visit_UnaryOpNode(self, node, context):
         res = RuntimeResult()
@@ -141,73 +200,3 @@ class Interpreter:
                     return res.failure(error)
         number.set_pos(node.pos_start, node.pos_end)
         return res.success(number)
-
-    def visit_ObjectAccessNode(self, node, context):
-        res = RuntimeResult()
-        object_name = res.register(self.visit(node.object_name, context))
-        if res.error:
-            return res
-        if isinstance(object_name, String):
-            second_string = res.register(self.visit(node.key, context))
-            if res.error:
-                return res
-            if isinstance(second_string, String):
-                string = String(object_name.value + second_string.value).set_pos(
-                    node.pos_start, node.pos_end
-                )
-                return res.success(string)
-            return res.failure(
-                RunTimeError(
-                    node.pos_start,
-                    node.pos_end,
-                    "{} is not a string.".format(node.key),
-                    context,
-                )
-            )
-        elif isinstance(object_name, Object):
-            result = object_name.get(node.key.var_name_tok.value)
-            if result is None:
-                return res.failure(
-                    RunTimeError(
-                        node.pos_start,
-                        node.pos_end,
-                        "Key '{}' not found in object.".format(
-                            node.key.var_name_tok.value
-                        ),
-                        context,
-                    )
-                )
-            return res.success(result)
-        return res.failure(
-            RunTimeError(
-                node.pos_start,
-                node.pos_end,
-                "Expected concatenation of two strings or an object access.",
-                context,
-            )
-        )
-
-    def visit_ObjectAssignNode(self, node, context):
-        res = RuntimeResult()
-        object_name = res.register(self.visit(node.object_name, context))
-        if res.error:
-            return res
-        value = res.register(self.visit(node.value, context))
-        if res.error:
-            return res
-        if isinstance(object_name, String):
-            return res.failure(
-                RunTimeError(
-                    node.pos_start,
-                    node.pos_end,
-                    "A String concatenation cannot be assigned to anything.",
-                    context,
-                )
-            )
-        object_name.set(str(node.key.var_name_tok.value), value)
-        object_name.set_pos(node.pos_start, node.pos_end)
-        return res.success(
-            "Key '{}' in object {} has been assigned the value {}.".format(
-                node.key, object_name.value, value.value
-            )
-        )

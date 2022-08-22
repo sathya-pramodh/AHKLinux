@@ -228,7 +228,7 @@ class Array:
         return rep_str
 
 
-class Object:
+class AssociativeArray:
     def __init__(self, value):
         self.value = value
         self.set_pos()
@@ -243,14 +243,26 @@ class Object:
         self.context = context
         return self
 
-    def set(self, key, value):
-        self.value[key] = value
+    def access(self, key):
+        for key_ in self.value.keys():
+            if key_.value == key:
+                return self.value[key_], None
+        return None, RunTimeError(
+            self.pos_start,
+            self.pos_end,
+            "Key '{}' doesn't exist in associative array.".format(key),
+            self.context,
+        )
 
-    def get(self, key):
-        return self.value.get(key, None)
+    def set(self, key, value):
+        for key_ in self.value.keys():
+            if key_.value == key.value:
+                self.value[key_] = value
+        else:
+            self.value[key] = value
 
     def copy(self):
-        copy = Object(self.value)
+        copy = Array(self.value)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
         return copy
@@ -258,12 +270,11 @@ class Object:
     def __repr__(self):
         rep_str = "{"
         count_ = 0
-        if isinstance(self.value, dict):
-            for key, value in self.value.items():
-                if count_ != len(self.value) - 1:
-                    rep_str += str(key.__repr__()) + ":" + str(value.__repr__()) + ","
-                else:
-                    rep_str += str(key.__repr__()) + ":" + str(value.__repr__())
-                count_ += 1
-            rep_str += "}"
-            return rep_str
+        for key, value in self.value.items():
+            if count_ != len(self.value) - 1:
+                rep_str += str(key.__repr__()) + ":" + str(value.__repr__()) + ","
+            else:
+                rep_str += str(key.__repr__()) + ":" + str(value.__repr__())
+            count_ += 1
+        rep_str += "}"
+        return rep_str

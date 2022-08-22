@@ -3,19 +3,17 @@ Grammar:
     expression: (KEYWORD:global)* IDENTIFIER ASSIGNMENT expression
               : (KEYWORD:global)* IDENTIFIER
               : term (PLUS|MINUS term)*
-              : term:STRING (DOT term:STRING)* (ASSIGNMENT expression)*
-              : term:IDENTIFIER (DOT term:IDENTIFIER)*
+              : term:STRING (DOT term:STRING)*
+              : term:IDENTIFIER (DOT term:IDENTIFIER)* (ASSIGNMENT expression)*
     term: factor (MULTIPLY|DIVIDE factor)*
-        : factor:STRING (DOT factor:STRING)*
-        : factor:IDENTIFIER (DOT factor:IDENTIFIER)*
     factor: (PLUS|MINUS) factor
           : atom
-    atom : DECIMAL|HEXADECIMAL|FLOAT|STRING|ARRAY
+    atom : DECIMAL|HEXADECIMAL|FLOAT|STRING
          : LPAREN expr RPAREN
          : array-expr
-         : object-expr
+         : associative-array-expr
     array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE
-    object-expr : LCURVE RCURVE
+    associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE
 """
 from constants import *
 from base_classes.nodes import *
@@ -41,6 +39,14 @@ class Parser:
         if self.tok_idx >= 0:
             self.current_tok = self.tokens[self.tok_idx]
         return self.current_tok
+
+    def check_next(self, idx):
+        for _ in range(idx):
+            self.advance()
+        result = self.current_tok
+        for _ in range(idx):
+            self.recede()
+        return result
 
     def parse(self):
         ast = []
@@ -113,26 +119,45 @@ class Parser:
                 return res.success(VarAssignNode(var_name, expr))
 
             elif self.current_tok.type == T_DOT:
-                self.advance()
-                if self.current_tok.type == T_IDENTIFIER:
+                op_tok = self.current_tok
+                result = self.check_next(2)
+                if result.type == T_ASSIGNMENT:
+                    self.advance()
                     key = self.current_tok
                     self.advance()
-                    if self.current_tok.type == T_ASSIGNMENT:
+                    self.advance()
+                    expr = res.register(self.expression())
+                    if res.error:
+                        return res
+                    return res.success(
+                        AssociativeArrayAssignNode(VarAccessNode(var_name), key, expr)
+                    )
+                self.advance()
+                accumulator = BinOpNode(
+                    VarAccessNode(var_name), op_tok, VarAccessNode(self.current_tok)
+                )
+                self.advance()
+                count_ = 2
+                while self.current_tok.type == T_DOT:
+                    result = self.check_next(2)
+                    if result.type == T_ASSIGNMENT:
+                        self.advance()
+                        key = self.current_tok
+                        self.advance()
                         self.advance()
                         expr = res.register(self.expression())
                         if res.error:
                             return res
                         return res.success(
-                            ObjectAssignNode(
-                                VarAccessNode(var_name), VarAccessNode(key), expr
-                            )
+                            AssociativeArrayAssignNode(accumulator, key, expr)
                         )
-                    else:
-                        self.recede()
-                        self.recede()
-                        self.recede()
-                else:
-                    self.recede()
+                    self.advance()
+                    accumulator = BinOpNode(
+                        accumulator, op_tok, VarAccessNode(self.current_tok)
+                    )
+                    self.advance()
+                    count_ += 2
+                for _ in range(count_ + 1):
                     self.recede()
 
             elif self.current_tok.type in (
@@ -141,9 +166,10 @@ class Parser:
                 T_MULTIPLY,
                 T_DIVIDE,
                 T_COMMA,
-                T_RSQUARE,
-                T_RCURVE,
+                T_LSQUARE,
+                T_LCURVE,
                 T_COLON,
+                T_DOT,
             ):
                 self.recede()
 
@@ -190,29 +216,6 @@ class Parser:
 
         elif tok.type == T_IDENTIFIER:
             self.advance()
-            if self.current_tok.type == T_DOT:
-                self.advance()
-                if self.current_tok.type == T_IDENTIFIER:
-                    key = self.current_tok
-                    return res.success(
-                        ObjectAccessNode(VarAccessNode(tok), VarAccessNode(key))
-                    )
-                elif self.current_tok.type == T_STRING:
-                    key = self.current_tok
-                    self.advance()
-                    return res.success(
-                        ObjectAccessNode(VarAccessNode(tok), StringNode(key))
-                    )
-                else:
-                    self.advance()
-                    return res.failure(
-                        InvalidSyntaxError(
-                            tok.pos_start,
-                            self.current_tok.pos_end,
-                            "Expected a key name after '.'.",
-                            self.context,
-                        )
-                    )
             return res.success(VarAccessNode(tok))
 
         elif tok.type == T_LPAREN:
@@ -258,30 +261,70 @@ class Parser:
             return res.success(
                 ArrayNode(value_nodes, tok.pos_start, self.current_tok.pos_end)
             )
-
         elif tok.type == T_LCURVE:
             self.advance()
             value_nodes = {}
             if self.current_tok.type == T_RCURVE:
                 self.advance()
             else:
-                return res.failure(
-                    InvalidSyntaxError(
-                        tok.pos_start,
-                        self.current_tok.pos_end,
-                        "Expected '}'.",
-                        self.context,
+                key_node = res.register(self.expression())
+                if res.error:
+                    return res
+                if self.current_tok.type != T_COLON:
+                    return res.failure(
+                        InvalidSyntaxError(
+                            tok.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected ':'.",
+                            self.context,
+                        )
                     )
-                )
+                self.advance()
+                value_node = res.register(self.expression())
+                if res.error:
+                    return res
+                value_nodes[key_node] = value_node
+                while self.current_tok.type == T_COMMA:
+                    self.advance()
+                    key_node = res.register(self.expression())
+                    if res.error:
+                        return res
+                    if self.current_tok.type != T_COLON:
+                        return res.failure(
+                            InvalidSyntaxError(
+                                tok.pos_start,
+                                self.current_tok.pos_end,
+                                "Expected ':'.",
+                                self.context,
+                            )
+                        )
+                    self.advance()
+                    value_node = res.register(self.expression())
+                    if res.error:
+                        return res
+                    value_nodes[key_node] = value_node
+                if self.current_tok.type != T_RCURVE:
+                    return res.failure(
+                        InvalidSyntaxError(
+                            tok.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected ',' or '}'.",
+                            self.context,
+                        )
+                    )
+                self.advance()
+
             return res.success(
-                ObjectNode(value_nodes, tok.pos_start, self.current_tok.pos_end)
+                AssociativeArrayNode(
+                    value_nodes, tok.pos_start, self.current_tok.pos_end
+                )
             )
 
         return res.failure(
             InvalidSyntaxError(
                 tok.pos_start,
                 tok.pos_end,
-                "Expected int, float, hexadecimal, string, array or an object",
+                "Expected int, float, hexadecimal, string or an object",
                 self.context,
             )
         )
