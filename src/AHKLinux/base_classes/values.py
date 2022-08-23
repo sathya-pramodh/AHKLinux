@@ -243,24 +243,24 @@ class AssociativeArray:
         self.context = context
         return self
 
-    def access(self, key):
-        for key_ in self.value.keys():
-            if key_.value == key:
-                return self.value[key_], None
-        return None, RunTimeError(
-            self.pos_start,
-            self.pos_end,
-            "Key '{}' doesn't exist in associative array.".format(key),
-            self.context,
-        )
-
     def set(self, key, value):
         for key_ in self.value.keys():
-            if key_.value == key.value:
+            if key_.var_name_tok.value == key.value:
                 self.value[key_] = value
                 break
         else:
             self.value[key] = value
+
+    def get(self, key):
+        for key_ in self.value.keys():
+            if key_.var_name_tok.value == key.value:
+                return self.value[key_], None
+        return None, RunTimeError(
+            self.pos_start,
+            self.pos_end,
+            "Key '{}' doesn't exist in Associative Array.".format(key),
+            self.context,
+        )
 
     def copy(self):
         copy = Array(self.value)

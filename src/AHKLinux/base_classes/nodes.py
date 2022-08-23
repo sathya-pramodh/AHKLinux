@@ -94,9 +94,19 @@ class AssociativeArrayAssignNode:
         self.access_node = access_node
         self.key = key
         self.value_node = value_node
-        if isinstance(access_node, VarAccessNode):
-            self.pos_start = self.access_node.pos_start
-            self.pos_end = self.access_node.pos_end
-        else:
-            self.pos_start = self.access_node.left_node.pos_start
-            self.pos_end = self.access_node.right_node.pos_end
+        self.pos_start = self.access_node.pos_start
+        self.pos_end = self.access_node.pos_end
+
+    def __repr__(self):
+        return f"{self.access_node}.{self.key}:{self.value_node}"
+
+
+class AssociativeArrayAccessNode:
+    def __init__(self, access_node, key):
+        self.access_node = access_node
+        self.key = key
+        self.pos_start = self.access_node.pos_start
+        self.pos_end = self.access_node.pos_end
+
+    def __repr__(self):
+        return f"{self.access_node}.{self.key}"

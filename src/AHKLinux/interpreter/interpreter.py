@@ -2,6 +2,7 @@ from base_classes.values import *
 from error_classes.runtime_error import RunTimeError
 from constants import *
 from interpreter.runtime_result import RuntimeResult
+from base_classes.nodes import StringNode
 
 
 class Interpreter:
@@ -142,7 +143,7 @@ class Interpreter:
             result.set_pos(node.pos_start, node.pos_end)
             return res.success(result)
         elif node.op_tok.type == T_DOT:
-            if getattr(left, "concatenated_to", None):
+            if isinstance(left, String):
                 right = res.register(self.visit(node.right_node, context))
                 if res.error:
                     return res
@@ -151,9 +152,8 @@ class Interpreter:
                     return res.failure(error)
                 result.set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
-            elif getattr(left, "access", None):
-                right = node.right_node.var_name_tok.value
-                result, error = left.access(right)
+            elif isinstance(left, AssociativeArray):
+                result, error = left.get(node.right_node.var_name_tok)
                 if error:
                     return res.failure(error)
                 result.set_pos(node.pos_start, node.pos_end)
@@ -162,9 +162,7 @@ class Interpreter:
                 RunTimeError(
                     node.pos_start,
                     node.pos_end,
-                    "'{}' is not a string or an associative array.".format(
-                        node.left_node
-                    ),
+                    "{} is not a string or an Associative Array.",
                     context,
                 )
             )
@@ -181,7 +179,7 @@ class Interpreter:
             compiled_access_node.set(node.key, compiled_value)
             return res.success(
                 "Key '{}' was assigned the value {}".format(
-                    node.key.value, compiled_value
+                    node.key.var_name_tok.value, compiled_value
                 )
             )
         return res.failure(
@@ -189,6 +187,42 @@ class Interpreter:
                 node.pos_start,
                 node.pos_end,
                 "{} is not an Associative Array.".format(node.access_node),
+                context,
+            )
+        )
+
+    def visit_AssociativeArrayAccessNode(self, node, context):
+        res = RuntimeResult()
+        compiled_access_node = res.register(self.visit(node.access_node, context))
+        if res.error:
+            return res
+        if isinstance(compiled_access_node, AssociativeArray):
+            if getattr(node.key, "var_name_tok", None):
+                value, error = compiled_access_node.get(node.key.var_name_tok)
+                if error:
+                    return res.failure(error)
+                return res.success(value)
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "Expected key name after '.'.",
+                    context,
+                )
+            )
+        if isinstance(compiled_access_node, String):
+            right = res.register(self.visit(node.key, context))
+            if res.error:
+                return res
+            result, error = compiled_access_node.concatenated_to(right)
+            if error:
+                return res.failure(error)
+            return res.success(result)
+        return res.failure(
+            RunTimeError(
+                node.pos_start,
+                node.pos_end,
+                "{} is not a String or an Associative Array.".format(node.access_node),
                 context,
             )
         )
