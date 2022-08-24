@@ -209,6 +209,39 @@ class Array:
         self.context = context
         return self
 
+    def set(self, idx, value):
+        if str(idx).find("x") != -1:
+            idx = str(int(str(idx), base=16))
+        if str(idx).find(".") != -1:
+            return 1, RunTimeError(
+                self.pos_start,
+                self.pos_end,
+                "Expected an integer or a hexadecimal for an array index.",
+                self.context,
+            )
+        if int(idx) < len(self.value) and int(idx) >= 0:
+            self.value[int(idx)] = value
+            return 0, None
+        return 1, RunTimeError(
+            self.pos_start, self.pos_end, "Index out of range.", self.context
+        )
+
+    def get(self, idx):
+        if str(idx).find("x") != -1:
+            idx = str(int(str(idx), base=16))
+        if str(idx).find(".") != -1:
+            return None, RunTimeError(
+                self.pos_start,
+                self.pos_end,
+                "Expected an integer or a hexadecimal for an array index.",
+                self.context,
+            )
+        if int(idx) < len(self.value) and int(idx) >= 0:
+            return self.value[int(idx)], None
+        return None, RunTimeError(
+            self.pos_start, self.pos_end, "Index out of range.", self.context
+        )
+
     def copy(self):
         copy = Array(self.value)
         copy.set_pos(self.pos_start, self.pos_end)
@@ -244,23 +277,18 @@ class AssociativeArray:
         return self
 
     def set(self, key, value):
-        for key_ in self.value.keys():
-            if key_.var_name_tok.value == key.value:
-                self.value[key_] = value
-                break
-        else:
-            self.value[key] = value
+        self.value[key] = value
 
     def get(self, key):
-        for key_ in self.value.keys():
-            if key_.var_name_tok.value == key.value:
-                return self.value[key_], None
-        return None, RunTimeError(
-            self.pos_start,
-            self.pos_end,
-            "Key '{}' doesn't exist in Associative Array.".format(key),
-            self.context,
-        )
+        value = self.value.get(key, None)
+        if value is None:
+            return None, RunTimeError(
+                self.pos_start,
+                self.pos_end,
+                "Key '{}' not found in object.".format(key),
+                self.context,
+            )
+        return value, None
 
     def copy(self):
         copy = Array(self.value)

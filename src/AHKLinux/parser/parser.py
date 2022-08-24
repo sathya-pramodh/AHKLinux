@@ -12,8 +12,8 @@ Grammar:
          : LPAREN expr RPAREN
          : array-expr
          : associative-array-expr
-    array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE
-    associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE
+    array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE (LSQUARE (atom)? RSQUARE)*
+    associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE (LSQUARE (atom)? RSQUARE)*
 """
 from constants import *
 from base_classes.nodes import *
@@ -42,7 +42,7 @@ class Parser:
             self.current_tok = self.tokens[self.tok_idx]
         return self.current_tok
 
-    def get_keys(self, accumulator, res, var_name):
+    def get_keys(self, accumulator, res, var_name, disable_assignment=False):
         while self.current_tok.type in (T_DOT, T_LSQUARE):
             if self.current_tok.type == T_DOT:
                 op_tok = self.current_tok
@@ -69,7 +69,6 @@ class Parser:
                                 self.context,
                             )
                         )
-                    break
             elif self.current_tok.type == T_LSQUARE:
                 self.advance()
                 if self.current_tok.type == T_RSQUARE:
@@ -116,11 +115,19 @@ class Parser:
                                 self.context,
                             )
                         )
-                    break
                 accumulator = BinOpNode(
                     accumulator, Token(T_DOT), VarAccessNode(inner_key.tok)
                 )
         if self.current_tok.type == T_ASSIGNMENT:
+            if disable_assignment:
+                return res.failure(
+                    InvalidSyntaxError(
+                        var_name.pos_start,
+                        self.current_tok.pos_end,
+                        "Cannot assign this type to anything.",
+                        self.context,
+                    )
+                )
             self.advance()
             value = res.register(self.expression())
             if res.error:
@@ -272,7 +279,6 @@ class Parser:
                         )
                     )
                 self.advance()
-
             return res.success(
                 AssociativeArrayNode(
                     value_nodes, tok.pos_start, self.current_tok.pos_end
@@ -371,7 +377,7 @@ class Parser:
             elif self.current_tok.type == T_LSQUARE:
                 self.advance()
                 inner_key = res.register(self.atom())
-                if res.error:
+                if res.error or inner_key is None:
                     return res
                 if isinstance(inner_key, VarAccessNode):
                     return res.failure(

@@ -148,21 +148,36 @@ class Interpreter:
                 if res.error:
                     return res
                 result, error = left.concatenated_to(right)
-                if error:
+                if error or result is None:
                     return res.failure(error)
                 result.set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
             elif isinstance(left, AssociativeArray):
-                result, error = left.get(node.right_node.var_name_tok)
-                if error:
+                result, error = left.get(node.right_node.var_name_tok.value)
+                if error or result is None:
                     return res.failure(error)
                 result.set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
+            elif isinstance(left, Array):
+                if str(node.right_node.var_name_tok.value) in "012345679":
+                    result, error = left.get(node.right_node.var_name_tok.value)
+                    if error or result is None:
+                        return res.failure(error)
+                    result.set_pos(node.pos_start, node.pos_end)
+                    return res.success(result)
+                return res.failure(
+                    RunTimeError(
+                        node.pos_start,
+                        node.pos_end,
+                        "Expected a Number in '[]'.",
+                        context,
+                    )
+                )
             return res.failure(
                 RunTimeError(
                     node.pos_start,
                     node.pos_end,
-                    "{} is not a string or an Associative Array.",
+                    "{} is not a string, an Array or an Associative Array.",
                     context,
                 )
             )
@@ -176,9 +191,18 @@ class Interpreter:
         if res.error:
             return res
         if isinstance(compiled_access_node, AssociativeArray):
-            compiled_access_node.set(node.key, compiled_value)
+            compiled_access_node.set(node.key.var_name_tok.value, compiled_value)
             return res.success(
-                "Key '{}' was assigned the value {}".format(
+                "Key '{}' was assigned the value {}.".format(
+                    node.key.var_name_tok.value, compiled_value
+                )
+            )
+        if isinstance(compiled_access_node, Array):
+            ret_code, error = compiled_access_node.set(node.key.value, compiled_value)
+            if error:
+                return res.failure(error)
+            return res.success(
+                "Index {} was assigned the value {}.".format(
                     node.key.var_name_tok.value, compiled_value
                 )
             )
@@ -186,7 +210,7 @@ class Interpreter:
             RunTimeError(
                 node.pos_start,
                 node.pos_end,
-                "{} is not an Associative Array.".format(node.access_node),
+                "{} is not an Array or an Associative Array.".format(node.access_node),
                 context,
             )
         )
@@ -196,20 +220,13 @@ class Interpreter:
         compiled_access_node = res.register(self.visit(node.access_node, context))
         if res.error:
             return res
+
         if isinstance(compiled_access_node, AssociativeArray):
-            if getattr(node.key, "var_name_tok", None):
-                value, error = compiled_access_node.get(node.key.var_name_tok)
-                if error:
-                    return res.failure(error)
-                return res.success(value)
-            return res.failure(
-                RunTimeError(
-                    node.pos_start,
-                    node.pos_end,
-                    "Expected key name after '.'.",
-                    context,
-                )
-            )
+            value, error = compiled_access_node.get(node.key.var_name_tok.value)
+            if error:
+                return res.failure(error)
+            return res.success(value)
+
         if isinstance(compiled_access_node, String):
             right = res.register(self.visit(node.key, context))
             if res.error:
@@ -218,11 +235,21 @@ class Interpreter:
             if error:
                 return res.failure(error)
             return res.success(result)
+
+        if isinstance(compiled_access_node, Array):
+            value, error = compiled_access_node.get(node.key.var_name_tok.value)
+            if error or value is None:
+                return res.failure(error)
+            value.set_pos(node.pos_start, node.pos_end)
+            return res.success(value)
+
         return res.failure(
             RunTimeError(
                 node.pos_start,
                 node.pos_end,
-                "{} is not a String or an Associative Array.".format(node.access_node),
+                "{} is not a String, an Array or an Associative Array.".format(
+                    node.access_node
+                ),
                 context,
             )
         )
