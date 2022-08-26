@@ -210,13 +210,11 @@ class Array:
         return self
 
     def set(self, idx, value):
-        if str(idx).find("x") != -1:
-            idx = str(int(str(idx), base=16))
         if str(idx).find(".") != -1:
             return 1, RunTimeError(
                 self.pos_start,
                 self.pos_end,
-                "Expected an integer or a hexadecimal for an array index.",
+                "Expected an integer for an array index.",
                 self.context,
             )
         if int(idx) < len(self.value) and int(idx) >= 0:
@@ -227,13 +225,11 @@ class Array:
         )
 
     def get(self, idx):
-        if str(idx).find("x") != -1:
-            idx = str(int(str(idx), base=16))
         if str(idx).find(".") != -1:
             return None, RunTimeError(
                 self.pos_start,
                 self.pos_end,
-                "Expected an integer or a hexadecimal for an array index.",
+                "Expected an integer for an array index.",
                 self.context,
             )
         if int(idx) < len(self.value) and int(idx) >= 0:
@@ -280,15 +276,15 @@ class AssociativeArray:
         self.value[key] = value
 
     def get(self, key):
-        value = self.value.get(key, None)
-        if value is None:
-            return None, RunTimeError(
-                self.pos_start,
-                self.pos_end,
-                "Key '{}' not found in object.".format(key),
-                self.context,
-            )
-        return value, None
+        for key_, value_ in self.value.items():
+            if key_.value == key:
+                return self.value[key_], None
+        return None, RunTimeError(
+            self.pos_start,
+            self.pos_end,
+            "Key '{}' not found in object.".format(key),
+            self.context,
+        )
 
     def copy(self):
         copy = Array(self.value)

@@ -159,7 +159,7 @@ class Interpreter:
                 result.set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
             elif isinstance(left, Array):
-                if str(node.right_node.var_name_tok.value) in "012345679":
+                if isinstance(node.right_node.var_name_tok.value, int):
                     result, error = left.get(node.right_node.var_name_tok.value)
                     if error or result is None:
                         return res.failure(error)
@@ -177,7 +177,7 @@ class Interpreter:
                 RunTimeError(
                     node.pos_start,
                     node.pos_end,
-                    "{} is not a string, an Array or an Associative Array.",
+                    "The object accessed is not a string, an Array or an Associative Array.",
                     context,
                 )
             )
@@ -237,19 +237,26 @@ class Interpreter:
             return res.success(result)
 
         if isinstance(compiled_access_node, Array):
-            value, error = compiled_access_node.get(node.key.var_name_tok.value)
-            if error or value is None:
-                return res.failure(error)
-            value.set_pos(node.pos_start, node.pos_end)
-            return res.success(value)
+            if isinstance(node.key.var_name_tok.value, int):
+                value, error = compiled_access_node.get(node.key.var_name_tok.value)
+                if error or value is None:
+                    return res.failure(error)
+                value.set_pos(node.pos_start, node.pos_end)
+                return res.success(value)
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "Expected a number inside '[]'.",
+                    context,
+                )
+            )
 
         return res.failure(
             RunTimeError(
                 node.pos_start,
                 node.pos_end,
-                "{} is not a String, an Array or an Associative Array.".format(
-                    node.access_node
-                ),
+                "The object accessed is not a String, an Array or an Associative Array.",
                 context,
             )
         )

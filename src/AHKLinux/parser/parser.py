@@ -58,7 +58,7 @@ class Parser:
                 previous_tok = self.current_tok
                 self.advance()
                 if self.current_tok == previous_tok:
-                    if previous_tok.type == T_DOT:
+                    if self.current_tok.type == T_DOT:
                         return res.failure(
                             UnexpectedEOLError(
                                 var_name.pos_start,
@@ -104,7 +104,7 @@ class Parser:
                 previous_tok = self.current_tok
                 self.advance()
                 if self.current_tok == previous_tok:
-                    if previous_tok.type == T_DOT:
+                    if self.current_tok.type == T_DOT:
                         return res.failure(
                             UnexpectedEOLError(
                                 var_name.pos_start,
@@ -223,7 +223,33 @@ class Parser:
                             self.context,
                         )
                     )
+                end_tok = self.current_tok
                 self.advance()
+                if self.current_tok.type == T_LSQUARE:
+                    self.advance()
+                    key = self.current_tok
+                    self.advance()
+                    if self.current_tok.type != T_RSQUARE and self.tok_idx < len(
+                        self.tokens
+                    ):
+                        return res.failure(
+                            InvalidSyntaxError(
+                                tok.pos_start,
+                                self.current_tok.pos_end,
+                                "Expected ']'.",
+                                self.context,
+                            )
+                        )
+                    self.advance()
+                    accumulator = BinOpNode(
+                        ArrayNode(value_nodes, tok.pos_start, end_tok.pos_end),
+                        Token(T_DOT),
+                        VarAccessNode(key),
+                    )
+                    res = self.get_keys(
+                        accumulator, res, end_tok, disable_assignment=True
+                    )
+                    return res
             return res.success(
                 ArrayNode(value_nodes, tok.pos_start, self.current_tok.pos_end)
             )
@@ -278,7 +304,48 @@ class Parser:
                             self.context,
                         )
                     )
+                end_tok = self.current_tok
                 self.advance()
+                if self.current_tok.type == T_LSQUARE:
+                    self.advance()
+                    key = self.current_tok
+                    self.advance()
+                    if self.current_tok.type != T_RSQUARE:
+                        return res.failure(
+                            InvalidSyntaxError(
+                                tok.pos_start,
+                                end_tok.pos_end,
+                                "Expected ']'.",
+                                self.context,
+                            )
+                        )
+                    self.advance()
+                    accumulator = BinOpNode(
+                        AssociativeArrayNode(
+                            value_nodes, tok.pos_start, end_tok.pos_end
+                        ),
+                        Token(T_DOT),
+                        VarAccessNode(key),
+                    )
+                    res = self.get_keys(
+                        accumulator, res, end_tok, disable_assignment=True
+                    )
+                    return res
+                if self.current_tok.type == T_DOT:
+                    self.advance()
+                    key = self.current_tok
+                    self.advance()
+                    accumulator = BinOpNode(
+                        AssociativeArrayNode(
+                            value_nodes, tok.pos_start, end_tok.pos_end
+                        ),
+                        Token(T_DOT),
+                        VarAccessNode(key),
+                    )
+                    res = self.get_keys(
+                        accumulator, res, end_tok, disable_assignment=True
+                    )
+                    return res
             return res.success(
                 AssociativeArrayNode(
                     value_nodes, tok.pos_start, self.current_tok.pos_end
@@ -410,10 +477,6 @@ class Parser:
                 T_MINUS,
                 T_MULTIPLY,
                 T_DIVIDE,
-                T_COMMA,
-                T_LSQUARE,
-                T_LCURVE,
-                T_COLON,
                 T_DOT,
             ):
                 self.recede()
