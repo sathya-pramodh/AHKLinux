@@ -114,6 +114,7 @@ class Lexer:
                     pos_start, self.pos, "'{}'".format(char), self.context
                 )
             self.advance()
+        tokens.append(Token(T_EOL, pos_start=self.pos))
         return tokens, None
 
     def make_number(self):
