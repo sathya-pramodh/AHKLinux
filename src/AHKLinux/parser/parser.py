@@ -4,7 +4,7 @@ Grammar:
               : (KEYWORD:global)* IDENTIFIER
               : term (PLUS|MINUS term)*
               : STRING (DOT STRING)*
-              : IDENTIFIER (DOT IDENTIFIER)* (LSQUARE (atom)? RSQUARE)* (ASSIGNMENT expression)*
+              : IDENTIFIER (DOT IDENTIFIER)* (LSQUARE (expression)? RSQUARE)* (ASSIGNMENT expression)*
     term: factor (MULTIPLY|DIVIDE factor)*
     factor: (PLUS|MINUS) factor
           : atom
@@ -13,8 +13,8 @@ Grammar:
          : array-expr
          : associative-array-expr
          : EOL
-    array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE (LSQUARE (atom)? RSQUARE)*
-    associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE (LSQUARE (atom)? RSQUARE)*
+    array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE (LSQUARE (expression)? RSQUARE)*
+    associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE (LSQUARE (expression)? RSQUARE)*
 """
 from constants import *
 from base_classes.nodes import *
