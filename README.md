@@ -6,8 +6,6 @@ An Interpreter for AutoHotKey on Linux
 ```
 python3 init.py
 ```
-- If the option `-i` is not specified this command will run an interactive console (similar to Python) on the terminal.
-- Else, it will just read and execute the input file specified.
 
 ## Options
 ### Debug Mode
@@ -34,3 +32,4 @@ python3 init.py -d
 ```
 python3 init.py -i <path_to_ahk_file>
 ```
+- This is a **required** option.
