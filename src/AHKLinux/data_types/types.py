@@ -1,22 +1,17 @@
 from error_classes.runtime_error import RunTimeError
+from base_classes.value import Value
 from constants import *
 
 
-class Number:
+class Number(Value):
     def __init__(self, value, type_):
+        super().__init__()
         self.value = value
         self.type = type_
-        self.set_pos()
-        self.set_context()
-
-    def set_pos(self, pos_start=None, pos_end=None):
-        self.pos_start = pos_start
-        self.pos_end = pos_end
-        return self
-
-    def set_context(self, context=None):
-        self.context = context
-        return self
+        if self.type == T_HEXADECIMAL:
+            self.boolean = True if int(self.value, base=16) != 0 else False
+        else:
+            self.boolean = True if self.value else False
 
     def added_to(self, other):
         if isinstance(other, Number):
@@ -159,20 +154,11 @@ class Number:
         return f"{self.value}"
 
 
-class String:
+class String(Value):
     def __init__(self, value):
+        super().__init__()
         self.value = value
-        self.set_pos()
-        self.set_context()
-
-    def set_pos(self, pos_start=None, pos_end=None):
-        self.pos_start = pos_start
-        self.pos_end = pos_end
-        return self
-
-    def set_context(self, context=None):
-        self.context = context
-        return self
+        self.boolean = True if self.value else False
 
     def concatenated_to(self, other):
         if not isinstance(other, String):
@@ -194,20 +180,39 @@ class String:
         return f"'{self.value}'"
 
 
-class Array:
+class Boolean(Value):
     def __init__(self, value):
+        super().__init__()
         self.value = value
-        self.set_pos()
-        self.set_context()
+        self.boolean = True if self.value == "true" else False
 
-    def set_pos(self, pos_start=None, pos_end=None):
-        self.pos_start = pos_start
-        self.pos_end = pos_end
-        return self
+    def compare(self, other, operator):
+        if operator == "and":
+            result = self.boolean and other.boolean
+            if result:
+                return Boolean("true")
+            return Boolean("false")
+        elif operator == "or":
+            result = self.boolean or other.boolean
+            if result:
+                return Boolean("true")
+            return Boolean("false")
 
-    def set_context(self, context=None):
-        self.context = context
-        return self
+    def copy(self):
+        copy = Boolean(self.value)
+        copy.set_pos(self.pos_start, self.pos_end)
+        copy.set_context(self.context)
+        return copy
+
+    def __repr__(self):
+        return f"{self.value}"
+
+
+class Array(Value):
+    def __init__(self, value):
+        super().__init__()
+        self.value = value
+        self.boolean = True if self.value else False
 
     def set(self, idx, value):
         if str(idx).find(".") != -1:
@@ -257,23 +262,22 @@ class Array:
         return rep_str
 
 
-class AssociativeArray:
+class AssociativeArray(Value):
     def __init__(self, value):
+        super().__init__()
         self.value = value
-        self.set_pos()
-        self.set_context()
-
-    def set_pos(self, pos_start=None, pos_end=None):
-        self.pos_start = pos_start
-        self.pos_end = pos_end
-        return self
-
-    def set_context(self, context=None):
-        self.context = context
-        return self
+        self.boolean = True if self.value else False
 
     def set(self, key, value):
-        self.value[key] = value
+        for key_, value_ in self.value.items():
+            if key_.value == key:
+                self.value[key_] = value
+                break
+        else:
+            if key in DIGITS:
+                self.value[Number(key, T_DECIMAL)] = value
+            elif key in LETTERS + "_":
+                self.value[String(key)] = value
 
     def get(self, key):
         for key_, value_ in self.value.items():

@@ -14,18 +14,21 @@ def start():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument(
         "-i",
-        nargs="?",
+        "--input",
+        type=str,
+        required=True,
         help="The input .ahk file for the interpreter.",
     )
     arg_parser.add_argument(
         "-d",
+        "--debug",
         action="store_const",
         const=input,
         help="To run the interpreter in debug mode.",
     )
     args = arg_parser.parse_args()
-    input_file = args.i if args.i is not None else input_file
-    debug_mode = True if args.d is not None else False
+    input_file = args.input
+    debug_mode = True if args.debug is not None else False
 
     return main(input_file, debug_mode)
 

@@ -20,7 +20,7 @@ class Error:
             result += "  File: '{}', line {}, in {}\n".format(
                 pos.filename, pos.line, context.display_name
             )
-            result += "    {}\n".format(pos.ftext.strip().split("\n")[0])
+            result += "    {}\n".format(pos.ftext.strip().split("\n")[pos.line - 1])
             pos = context.parent_entry_pos
             context = context.parent
 

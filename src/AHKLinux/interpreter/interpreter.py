@@ -1,8 +1,7 @@
-from base_classes.values import *
+from data_types.types import *
 from error_classes.runtime_error import RunTimeError
 from constants import *
 from interpreter.runtime_result import RuntimeResult
-from base_classes.nodes import StringNode
 
 
 class Interpreter:
@@ -29,6 +28,14 @@ class Interpreter:
             .set_pos(node.pos_start, node.pos_end)
         )
         return RuntimeResult().success(string)
+
+    def visit_BooleanNode(self, node, context):
+        boolean = (
+            Boolean(node.tok.value)
+            .set_context(context)
+            .set_pos(node.pos_start, node.pos_end)
+        )
+        return RuntimeResult().success(boolean)
 
     def visit_ArrayNode(self, node, context):
         res = RuntimeResult()
@@ -94,6 +101,7 @@ class Interpreter:
             context.symbol_table.set(var_name, var_value, global_=True)
         else:
             context.symbol_table.set(var_name, var_value)
+        var_value.set_context(context).set_pos(node.pos_start, node.pos_end)
         return res.success(
             "'{}' has been assigned the value {}.".format(var_name, var_value)
         )
@@ -111,7 +119,7 @@ class Interpreter:
             result, error = left.added_to(right)
             if error:
                 return res.failure(error)
-            result.set_pos(node.pos_start, node.pos_end)
+            result.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(result)
         elif node.op_tok.type == T_MINUS:
             right = res.register(self.visit(node.right_node, context))
@@ -120,7 +128,7 @@ class Interpreter:
             result, error = left.subtracted_by(right)
             if error:
                 return res.failure(error)
-            result.set_pos(node.pos_start, node.pos_end)
+            result.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(result)
 
         elif node.op_tok.type == T_MULTIPLY:
@@ -130,7 +138,7 @@ class Interpreter:
             result, error = left.multiplied_by(right)
             if error:
                 return res.failure(error)
-            result.set_pos(node.pos_start, node.pos_end)
+            result.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(result)
         elif node.op_tok.type == T_DIVIDE:
             right = res.register(self.visit(node.right_node, context))
@@ -140,7 +148,7 @@ class Interpreter:
 
             if error:
                 return res.failure(error)
-            result.set_pos(node.pos_start, node.pos_end)
+            result.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(result)
         elif node.op_tok.type == T_DOT:
             if isinstance(left, String):
@@ -150,20 +158,20 @@ class Interpreter:
                 result, error = left.concatenated_to(right)
                 if error or result is None:
                     return res.failure(error)
-                result.set_pos(node.pos_start, node.pos_end)
+                result.set_context(context).set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
             elif isinstance(left, AssociativeArray):
                 result, error = left.get(node.right_node.var_name_tok.value)
                 if error or result is None:
                     return res.failure(error)
-                result.set_pos(node.pos_start, node.pos_end)
+                result.set_context(context).set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
             elif isinstance(left, Array):
                 if isinstance(node.right_node.var_name_tok.value, int):
                     result, error = left.get(node.right_node.var_name_tok.value)
                     if error or result is None:
                         return res.failure(error)
-                    result.set_pos(node.pos_start, node.pos_end)
+                    result.set_context(context).set_pos(node.pos_start, node.pos_end)
                     return res.success(result)
                 return res.failure(
                     RunTimeError(
@@ -181,8 +189,18 @@ class Interpreter:
                     context,
                 )
             )
+        elif node.op_tok.matches(T_KEYWORD, "and") or node.op_tok.matches(
+            T_KEYWORD, "or"
+        ):
+            right = res.register(self.visit(node.right_node, context))
+            if res.error:
+                return res
+            operator = "and" if node.op_tok.matches(T_KEYWORD, "and") else "or"
+            result = left.compare(right, operator)
+            result.set_context(context).set_pos(node.pos_start, node.pos_end)
+            return res.success(result)
 
-    def visit_AssociativeArrayAssignNode(self, node, context):
+    def visit_ObjectAssignNode(self, node, context):
         res = RuntimeResult()
         compiled_access_node = res.register(self.visit(node.access_node, context))
         if res.error:
@@ -192,18 +210,33 @@ class Interpreter:
             return res
         if isinstance(compiled_access_node, AssociativeArray):
             compiled_access_node.set(node.key.var_name_tok.value, compiled_value)
+            compiled_value.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(
                 "Key '{}' was assigned the value {}.".format(
                     node.key.var_name_tok.value, compiled_value
                 )
             )
         if isinstance(compiled_access_node, Array):
-            ret_code, error = compiled_access_node.set(node.key.value, compiled_value)
-            if error:
-                return res.failure(error)
-            return res.success(
-                "Index {} was assigned the value {}.".format(
+            if isinstance(node.key.var_name_tok.value, int):
+                ret_code, error = compiled_access_node.set(
                     node.key.var_name_tok.value, compiled_value
+                )
+                if error:
+                    return res.failure(error)
+                compiled_value.set_context(context).set_pos(
+                    node.pos_start, node.pos_end
+                )
+                return res.success(
+                    "Index {} was assigned the value {}.".format(
+                        node.key.var_name_tok.value, compiled_value
+                    )
+                )
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "Array indices can only be integers.",
+                    context,
                 )
             )
         return res.failure(
@@ -215,7 +248,7 @@ class Interpreter:
             )
         )
 
-    def visit_AssociativeArrayAccessNode(self, node, context):
+    def visit_ObjectAccessNode(self, node, context):
         res = RuntimeResult()
         compiled_access_node = res.register(self.visit(node.access_node, context))
         if res.error:
@@ -223,8 +256,9 @@ class Interpreter:
 
         if isinstance(compiled_access_node, AssociativeArray):
             value, error = compiled_access_node.get(node.key.var_name_tok.value)
-            if error:
+            if error or value is None:
                 return res.failure(error)
+            value.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(value)
 
         if isinstance(compiled_access_node, String):
@@ -232,8 +266,9 @@ class Interpreter:
             if res.error:
                 return res
             result, error = compiled_access_node.concatenated_to(right)
-            if error:
+            if error or result is None:
                 return res.failure(error)
+            result.set_pos(node.pos_start, node.pos_end)
             return res.success(result)
 
         if isinstance(compiled_access_node, Array):
@@ -247,7 +282,7 @@ class Interpreter:
                 RunTimeError(
                     node.pos_start,
                     node.pos_end,
-                    "Expected a number inside '[]'.",
+                    "Array indices can only be integers.",
                     context,
                 )
             )
@@ -267,6 +302,21 @@ class Interpreter:
         if res.error:
             return res
 
+        if node.op_tok.matches(T_KEYWORD, "not"):
+            if number.boolean:
+                boolean = (
+                    Boolean("false")
+                    .set_context(context)
+                    .set_pos(node.pos_start, node.pos_end)
+                )
+                return res.success(boolean)
+            boolean = (
+                Boolean("true")
+                .set_context(context)
+                .set_pos(node.pos_start, node.pos_end)
+            )
+            return res.success(boolean)
+
         if node.op_tok.type == T_MINUS:
             if number.type == T_HEXADECIMAL:
                 number, error = number.multiplied_by(Number("-0x1", T_HEXADECIMAL))
@@ -278,3 +328,39 @@ class Interpreter:
                     return res.failure(error)
         number.set_pos(node.pos_start, node.pos_end)
         return res.success(number)
+
+    def visit_IfNode(self, node, context):
+        res = RuntimeResult()
+        condition = res.register(self.visit(node.condition_node, context))
+        if res.error:
+            return res
+        if condition.boolean:
+            outputs = []
+            for expr in node.statements:
+                result = res.register(self.visit(expr, context))
+                if res.error:
+                    return res
+                outputs.append(result)
+            return res.success(outputs)
+        return res.success([])
+
+    def visit_IfElseNode(self, node, context):
+        res = RuntimeResult()
+        condition = res.register(self.visit(node.condition_node, context))
+        if res.error:
+            return res
+        if condition.boolean:
+            outputs = []
+            for expr in node.statements:
+                result = res.register(self.visit(expr, context))
+                if res.error:
+                    return res
+                outputs.append(result)
+            return res.success(outputs)
+        outputs = []
+        for expr in node.else_statements:
+            result = res.register(self.visit(expr, context))
+            if res.error:
+                return res
+            outputs.append(result)
+        return res.success(outputs)

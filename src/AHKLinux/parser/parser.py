@@ -2,19 +2,21 @@
 Grammar:
     expression: (KEYWORD:global)* IDENTIFIER ASSIGNMENT expression
               : (KEYWORD:global)* IDENTIFIER
+              : if-expr
               : term (PLUS|MINUS term)*
               : STRING (DOT STRING)*
               : IDENTIFIER (DOT IDENTIFIER)* (LSQUARE (expression)? RSQUARE)* (ASSIGNMENT expression)*
     term: factor (MULTIPLY|DIVIDE factor)*
     factor: (PLUS|MINUS) factor
+          : (KEYWORD:not) expression
           : atom
-    atom : DECIMAL|HEXADECIMAL|FLOAT|STRING
+    atom : DECIMAL|HEXADECIMAL|FLOAT|STRING|BOOLEAN
          : LPAREN expr RPAREN
          : array-expr
          : associative-array-expr
-         : EOL
     array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE (LSQUARE (expression)? RSQUARE)*
     associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE (LSQUARE (expression)? RSQUARE)*
+    if-expr : KEYWORD:if expression (KEYWORD:and|or expression)* LCURVE expression (EOL expression)* (KEYWORD:else LCURVE expression (EOL expression)* RCURVE)?
 """
 from constants import *
 from base_classes.nodes import *
@@ -36,8 +38,10 @@ class Parser:
             res = self.expression()
             if res.error:
                 return [], res.error
+            if res.node is None:
+                continue
             ast.append(res)
-            if self.current_tok.type == T_EOL:
+            if self.current_tok.type == T_EOF:
                 break
         return ast, None
 
@@ -82,15 +86,6 @@ class Parser:
                 inner_key = res.register(self.expression())
                 if res.error:
                     return res
-                if isinstance(inner_key, VarAccessNode):
-                    return res.failure(
-                        InvalidSyntaxError(
-                            var_name.pos_start,
-                            self.current_tok.pos_end,
-                            "Usage of variable names inside '[]' is not allowed.",
-                            self.context,
-                        )
-                    )
                 if self.current_tok.type != T_RSQUARE:
                     return res.failure(
                         InvalidSyntaxError(
@@ -121,12 +116,10 @@ class Parser:
             if res.error:
                 return res
             return res.success(
-                AssociativeArrayAssignNode(
-                    accumulator.left_node, accumulator.right_node, value
-                )
+                ObjectAssignNode(accumulator.left_node, accumulator.right_node, value)
             )
         return res.success(
-            AssociativeArrayAccessNode(accumulator.left_node, accumulator.right_node)
+            ObjectAccessNode(accumulator.left_node, accumulator.right_node)
         )
 
     def bin_op(self, func, ops):
@@ -146,6 +139,117 @@ class Parser:
 
         return res.success(left)
 
+    def get_condition(self):
+        res = ParseResult()
+        left = res.register(self.expression())
+        if res.error:
+            return res
+        cond = self.current_tok.matches(T_KEYWORD, "and") or self.current_tok.matches(
+            T_KEYWORD, "or"
+        )
+        while cond:
+            op_tok = self.current_tok
+            res.register_advancement()
+            self.advance()
+            if self.current_tok.type == T_LPAREN:
+                res.register_advancement()
+                self.advance()
+            right = res.register(self.expression())
+            if res.error:
+                return res
+            left = BinOpNode(left, op_tok, right)
+            cond = self.current_tok.matches(
+                T_KEYWORD, "and"
+            ) or self.current_tok.matches(T_KEYWORD, "or")
+        return res.success(left)
+
+    def if_expr(self, pos_start):
+        res = ParseResult()
+        condition_node = res.register(self.get_condition())
+        if res.error:
+            return res
+        if self.current_tok.type == T_EOL:
+            res.register_advancement()
+            self.advance()
+        if self.current_tok.type != T_LCURVE:
+            return res.failure(
+                InvalidSyntaxError(
+                    pos_start,
+                    self.current_tok.pos_end,
+                    "Expected '{'.",
+                    self.context,
+                )
+            )
+        res.register_advancement()
+        self.advance()
+        expressions = []
+        while self.current_tok.type == T_EOL:
+            res.register_advancement()
+            self.advance()
+            if self.current_tok.type == T_RCURVE:
+                break
+            expr = res.register(self.expression())
+            if res.error:
+                return res
+            expressions.append(expr)
+        if self.current_tok.type != T_RCURVE:
+            return res.failure(
+                InvalidSyntaxError(
+                    pos_start,
+                    self.current_tok.pos_end,
+                    "Expected '}'.",
+                    self.context,
+                )
+            )
+        res.register_advancement()
+        self.advance()
+        if self.current_tok.type == T_EOL:
+            res.register_advancement()
+            self.advance()
+        if self.current_tok.matches(T_KEYWORD, "else"):
+            pos_start = self.current_tok.pos_start
+            res.register_advancement()
+            self.advance()
+            if self.current_tok.type == T_EOL:
+                res.register_advancement()
+                self.advance()
+            if self.current_tok.type != T_LCURVE:
+                return res.failure(
+                    InvalidSyntaxError(
+                        pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '{'.",
+                        self.context,
+                    )
+                )
+            res.register_advancement()
+            self.advance()
+            else_expressions = []
+            while self.current_tok.type == T_EOL:
+                res.register_advancement()
+                self.advance()
+                if self.current_tok.type == T_RCURVE:
+                    break
+                expr = res.register(self.expression())
+                if res.error:
+                    return res
+                else_expressions.append(expr)
+            if self.current_tok.type != T_RCURVE:
+                return res.failure(
+                    InvalidSyntaxError(
+                        pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '}'.",
+                        self.context,
+                    )
+                )
+            res.register_advancement()
+            self.advance()
+            return res.success(
+                IfElseNode(condition_node, expressions, else_expressions)
+            )
+        return res.success(IfNode(condition_node, expressions))
+
     def atom(self):
         res = ParseResult()
         tok = self.current_tok
@@ -159,6 +263,11 @@ class Parser:
             res.register_advancement()
             self.advance()
             return res.success(StringNode(tok))
+
+        elif tok.type == T_BOOLEAN:
+            res.register_advancement()
+            self.advance()
+            return res.success(BooleanNode(tok))
 
         elif tok.type == T_IDENTIFIER:
             res.register_advancement()
@@ -350,7 +459,9 @@ class Parser:
                     value_nodes, tok.pos_start, self.current_tok.pos_end
                 )
             )
-        elif tok.type == T_EOL:
+        elif tok.type in (T_EOL, T_EOF):
+            res.register_advancement()
+            self.advance()
             return res
 
         return res.failure(
@@ -365,18 +476,23 @@ class Parser:
     def factor(self):
         res = ParseResult()
         tok = self.current_tok
-        if tok.type in (T_PLUS, T_MINUS):
+        if tok.type in (T_PLUS, T_MINUS, T_KEYWORD):
             res.register_advancement()
             self.advance()
-            factor = res.register(self.factor())
-            if res.error:
-                return res
+            if tok.matches(T_KEYWORD, "not"):
+                factor = res.register(self.expression())
+                if res.error:
+                    return res
+            else:
+                factor = res.register(self.factor())
+                if res.error:
+                    return res
             return res.success(UnaryOpNode(tok, factor))
 
         return self.atom()
 
     def term(self):
-        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_DOT))
+        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_DOT, T_KEYWORD))
 
     def expression(self):
         res = ParseResult()
@@ -413,6 +529,13 @@ class Parser:
                 return res
             return res.success(VarAssignNode(var_name, expr, "global"))
 
+        elif self.current_tok.matches(T_KEYWORD, "if"):
+            pos_start = self.current_tok.pos_start
+            res.register_advancement()
+            self.advance()
+            res = self.if_expr(pos_start)
+            return res
+
         elif self.current_tok.type == T_IDENTIFIER:
             var_name = self.current_tok
             res.register_advancement()
@@ -437,27 +560,21 @@ class Parser:
                     self.recede()
                 else:
                     accumulator = BinOpNode(
-                        VarAccessNode(var_name), op_tok, VarAccessNode(self.current_tok)
+                        VarAccessNode(var_name),
+                        op_tok,
+                        VarAccessNode(self.current_tok),
                     )
                     res.register_advancement()
                     self.advance()
                     res = self.get_keys(accumulator, res, var_name)
                     return res
+
             elif self.current_tok.type == T_LSQUARE:
                 res.register_advancement()
                 self.advance()
                 inner_key = res.register(self.expression())
                 if res.error or inner_key is None:
                     return res
-                if isinstance(inner_key, VarAccessNode):
-                    return res.failure(
-                        InvalidSyntaxError(
-                            var_name.pos_start,
-                            self.current_tok.pos_end,
-                            "Usage of variable names inside '[]' is not allowed.",
-                            self.context,
-                        )
-                    )
                 accumulator = BinOpNode(
                     VarAccessNode(var_name),
                     Token(T_DOT),
@@ -476,28 +593,15 @@ class Parser:
                 self.advance()
                 res = self.get_keys(accumulator, res, var_name)
                 return res
-            elif self.current_tok.type in (
-                T_PLUS,
-                T_MINUS,
-                T_MULTIPLY,
-                T_DIVIDE,
-                T_DOT,
-            ):
-                res.register_recession()
-                self.recede()
 
             res.register_recession()
             self.recede()
 
-        elif self.current_tok.type in (T_LSQUARE, T_LCURVE, T_IDENTIFIER):
-            node = res.register(self.atom())
-            if res.error:
-                return res
-            return res.success(node)
-
-        elif self.current_tok.type == T_EOL:
+        elif self.current_tok.type in (T_EOL, T_EOF):
+            res.register_advancement()
+            self.advance()
             return res
-        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_DOT)))
+        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_DOT, T_KEYWORD)))
         if res.error:
             return res
         return res.success(node)

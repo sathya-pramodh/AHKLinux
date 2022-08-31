@@ -5,9 +5,9 @@ from constants import *
 
 
 class Lexer:
-    def __init__(self, text, filename, context, lineno):
+    def __init__(self, text, filename, context):
         self.text = text
-        self.pos = Position(filename, 0, lineno, text)
+        self.pos = Position(filename, 0, 1, text)
         self.context = context
         if self.text == "":
             self.current_char = None
@@ -15,7 +15,7 @@ class Lexer:
             self.current_char = self.text[self.pos.idx]
 
     def advance(self):
-        self.pos.advance()
+        self.pos.advance(self.current_char)
         self.current_char = (
             self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
         )
@@ -32,9 +32,12 @@ class Lexer:
             return [], None
 
         while self.current_char is not None:
-            if self.current_char in " \t\n":
+            if self.current_char in " \t":
                 self.advance()
                 continue
+
+            elif self.current_char == "\n":
+                tokens.append(Token(T_EOL, pos_start=self.pos))
 
             elif self.current_char == ".":
                 tokens.append(Token(T_DOT, pos_start=self.pos))
@@ -114,7 +117,7 @@ class Lexer:
                     pos_start, self.pos, "'{}'".format(char), self.context
                 )
             self.advance()
-        tokens.append(Token(T_EOL, pos_start=self.pos))
+        tokens.append(Token(T_EOF, pos_start=self.pos))
         return tokens, None
 
     def make_number(self):
@@ -191,7 +194,13 @@ class Lexer:
             identifier_str += self.current_char
             self.advance()
 
-        tok_type = T_KEYWORD if identifier_str in KEYWORDS else T_IDENTIFIER
+        tok_type = ""
+        if identifier_str in KEYWORDS:
+            tok_type = T_KEYWORD
+        elif identifier_str in BOOLEANS:
+            tok_type = T_BOOLEAN
+        else:
+            tok_type = T_IDENTIFIER
         return Token(tok_type, identifier_str, pos_start)
 
     def make_string(self):

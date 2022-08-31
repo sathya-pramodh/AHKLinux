@@ -5,8 +5,10 @@ class Position:
         self.line = line
         self.ftext = ftext
 
-    def advance(self):
+    def advance(self, current_char):
         self.idx += 1
+        if current_char == "\n":
+            self.line += 1
         return self
 
     def copy(self):
