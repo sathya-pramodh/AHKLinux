@@ -6,6 +6,15 @@ from base_classes.context import Context
 from base_classes.symbol_table import SymbolTable
 
 
+def print_result_list(results, debug_mode):
+    if not isinstance(results, list):
+        print(results)
+        return
+    for result in results:
+        print_result_list(result, debug_mode)
+    return
+
+
 def main(input_file, debug_mode):
     if "~" in input_file:
         input_file = os.path.expanduser(input_file)
@@ -37,22 +46,11 @@ def main(input_file, debug_mode):
         if result.error:
             print(result.error.as_string())
             return 1
-        elif debug_mode:
-            if isinstance(result.value, list):
-                for results in result.value:
-                    if not debug_mode and not isinstance(results, str):
-                        print(results.value)
-                    elif debug_mode:
-                        print(results)
-            else:
+        if isinstance(result.value, list):
+            print_result_list(result.value, debug_mode)
+        else:
+            if debug_mode:
                 print(result.value)
-        elif not debug_mode and not isinstance(result.value, str):
-            if isinstance(result.value, list):
-                for results in result.value:
-                    if not debug_mode and not isinstance(results, str):
-                        print(results.value)
-                    elif debug_mode:
-                        print(results)
-            else:
+            elif not debug_mode and not isinstance(result.value, str):
                 print(result.value)
     return 0
