@@ -18,7 +18,7 @@ Grammar:
     array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE (LSQUARE (expression)? RSQUARE)*
     associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE (LSQUARE (expression)? RSQUARE)*
     if-expr : KEYWORD:if expression (KEYWORD:and|or expression)* LCURVE expression (EOL expression)* (KEYWORD:else LCURVE expression (EOL expression)* RCURVE)?
-    block-comment : T_BCOMMENT .* T_BCOMMENT
+    block-comment : BCOMMENT_START .* T_BCOMMENT_END
 """
 from constants import *
 from base_classes.nodes import *
