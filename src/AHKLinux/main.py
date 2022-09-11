@@ -1,9 +1,10 @@
 import os
-from lexer.lexer import Lexer
-from parser.parser import Parser
-from interpreter.interpreter import Interpreter
+
 from base_classes.context import Context
 from base_classes.symbol_table import SymbolTable
+from interpreter.interpreter import Interpreter
+from lexer.lexer import Lexer
+from parser.parser import Parser
 
 
 def print_result_list(results, debug_mode):

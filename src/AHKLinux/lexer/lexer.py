@@ -1,7 +1,7 @@
-from base_classes.tokens import Token
 from base_classes.position import Position
-from error_classes.illegal_char_error import IllegalCharError
+from base_classes.tokens import Token
 from constants import *
+from error_classes.illegal_char_error import IllegalCharError
 
 
 class Lexer:
@@ -27,13 +27,19 @@ class Lexer:
         return self.text[idx + 1] if idx + 1 < len(self.text) else None
 
     def tokenize(self):
-        tokens = []
+        tokens = [Token(T_SOF, pos_start=self.pos)]
         if self.text == "":
             return [], None
 
         while self.current_char is not None:
             if self.current_char in " \t":
                 self.advance()
+                continue
+
+            elif self.current_char == ";":
+                self.advance()
+                while self.current_char != "\n":
+                    self.advance()
                 continue
 
             elif self.current_char == "\n":
@@ -49,10 +55,30 @@ class Lexer:
                 tokens.append(Token(T_MINUS, pos_start=self.pos))
 
             elif self.current_char == "*":
-                tokens.append(Token(T_MULTIPLY, pos_start=self.pos))
+                pos_start = self.pos.copy()
+                self.advance()
+                if self.current_char == "/":
+                    self.advance()
+                    tokens.append(
+                        Token(T_BCOMMENT_END, pos_start=pos_start, pos_end=self.pos)
+                    )
+                    continue
+                else:
+                    tokens.append(Token(T_MULTIPLY, pos_start=self.pos))
+                    continue
 
             elif self.current_char == "/":
-                tokens.append(Token(T_DIVIDE, pos_start=self.pos))
+                pos_start = self.pos.copy()
+                self.advance()
+                if self.current_char == "*":
+                    self.advance()
+                    tokens.append(
+                        Token(T_BCOMMENT_START, pos_start=pos_start, pos_end=self.pos)
+                    )
+                    continue
+                else:
+                    tokens.append(Token(T_DIVIDE, pos_start=pos_start))
+                    continue
 
             elif self.current_char in LETTERS + "@#_$":
                 tokens.append(self.make_identifier())

@@ -14,9 +14,11 @@ Grammar:
          : LPAREN expr RPAREN
          : array-expr
          : associative-array-expr
+         : block-comment
     array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE (LSQUARE (expression)? RSQUARE)*
     associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE (LSQUARE (expression)? RSQUARE)*
     if-expr : KEYWORD:if expression (KEYWORD:and|or expression)* LCURVE expression (EOL expression)* (KEYWORD:else LCURVE expression (EOL expression)* RCURVE)?
+    block-comment : T_BCOMMENT .* T_BCOMMENT
 """
 from constants import *
 from base_classes.nodes import *
@@ -121,6 +123,22 @@ class Parser:
         return res.success(
             ObjectAccessNode(accumulator.left_node, accumulator.right_node)
         )
+
+    def ignore_block_comment(self):
+        res = ParseResult()
+        while self.current_tok.type != T_BCOMMENT_END:
+            self.advance()
+        self.recede()
+        previous_tok = self.current_tok
+        self.advance()
+        self.advance()
+        if (previous_tok.type == T_EOL or previous_tok.type == T_SOF) and (
+            self.current_tok.type == T_EOL or self.current_tok.type == T_EOF
+        ):
+            self.advance()
+            return res
+        else:
+            return self.ignore_block_comment()
 
     def bin_op(self, func, ops):
         res = ParseResult()
@@ -459,16 +477,27 @@ class Parser:
                     value_nodes, tok.pos_start, self.current_tok.pos_end
                 )
             )
-        elif tok.type in (T_EOL, T_EOF):
+        elif tok.type in (T_EOL, T_EOF, T_SOF):
             res.register_advancement()
             self.advance()
             return res
+
+        elif tok.type == T_BCOMMENT_START:
+            self.recede()
+            previous_tok = self.current_tok
+            self.advance()
+            self.advance()
+            if (previous_tok.type == T_EOL or previous_tok.type == T_SOF) and (
+                self.current_tok.type == T_EOL or self.current_tok.type == T_EOF
+            ):
+                self.advance()
+                return self.ignore_block_comment()
 
         return res.failure(
             InvalidSyntaxError(
                 tok.pos_start,
                 tok.pos_end,
-                "Expected int, float, hexadecimal, string or an object",
+                "Expected int, float, hexadecimal, string, an object or a comment.",
                 self.context,
             )
         )
@@ -597,7 +626,7 @@ class Parser:
             res.register_recession()
             self.recede()
 
-        elif self.current_tok.type in (T_EOL, T_EOF):
+        elif self.current_tok.type in (T_EOL, T_EOF, T_SOF):
             res.register_advancement()
             self.advance()
             return res

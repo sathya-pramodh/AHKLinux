@@ -1,6 +1,10 @@
-from data_types.types import *
-from error_classes.runtime_error import RunTimeError
 from constants import *
+from data_types.array import Array
+from data_types.associative_array import AssociativeArray
+from data_types.boolean import Boolean
+from data_types.number import Number
+from data_types.string import String
+from error_classes.runtime_error import RunTimeError
 from interpreter.runtime_result import RuntimeResult
 
 
