@@ -57,22 +57,41 @@ class Parser:
             self.tok_idx -= 1
             self.current_tok = self.tokens[self.tok_idx]
 
-    def get_keys(self, accumulator, res, var_name, disable_assignment=False):
-        while self.current_tok.type in (T_DOT, T_LSQUARE):
+    def get_keys(
+        self,
+        accumulator,
+        access_method,
+        res,
+        var_name,
+        disable_assignment=False,
+        disable_dot=False,
+    ):
+        ops = [T_LSQUARE] if disable_dot else [T_DOT, T_LSQUARE]
+        while self.current_tok.type in ops:
             if self.current_tok.type == T_DOT:
-                op_tok = self.current_tok
-                res.register_advancement()
-                self.advance()
-                if self.current_tok.type == T_STRING:
-                    accumulator = BinOpNode(
-                        accumulator, op_tok, StringNode(self.current_tok)
-                    )
+                if not disable_dot:
+                    op_tok = self.current_tok
+                    res.register_advancement()
+                    self.advance()
+                    if self.current_tok.type == T_STRING:
+                        accumulator = BinOpNode(
+                            accumulator, op_tok, StringNode(self.current_tok)
+                        )
+                    else:
+                        accumulator = BinOpNode(
+                            accumulator, op_tok, VarAccessNode(self.current_tok)
+                        )
+                    res.register_advancement()
+                    self.advance()
                 else:
-                    accumulator = BinOpNode(
-                        accumulator, op_tok, VarAccessNode(self.current_tok)
+                    return res.failure(
+                        InvalidSyntaxError(
+                            var_name.pos_start,
+                            self.current_tok.pos_end,
+                            "Cannot use '.' for this operation.",
+                            self.context,
+                        )
                     )
-                res.register_advancement()
-                self.advance()
             elif self.current_tok.type == T_LSQUARE:
                 res.register_advancement()
                 self.advance()
@@ -99,9 +118,12 @@ class Parser:
                     )
                 res.register_advancement()
                 self.advance()
-                accumulator = BinOpNode(
-                    accumulator, Token(T_DOT), VarAccessNode(inner_key.tok)
-                )
+                if isinstance(inner_key, VarAccessNode):
+                    accumulator = BinOpNode(accumulator, Token(T_LSQUARE), inner_key)
+                else:
+                    accumulator = BinOpNode(
+                        accumulator, Token(T_LSQUARE), VarAccessNode(inner_key.tok)
+                    )
         if self.current_tok.type == T_ASSIGNMENT:
             if disable_assignment:
                 return res.failure(
@@ -118,10 +140,14 @@ class Parser:
             if res.error:
                 return res
             return res.success(
-                ObjectAssignNode(accumulator.left_node, accumulator.right_node, value)
+                ObjectAssignNode(
+                    accumulator.left_node, accumulator.right_node, access_method, value
+                )
             )
         return res.success(
-            ObjectAccessNode(accumulator.left_node, accumulator.right_node)
+            ObjectAccessNode(
+                accumulator.left_node, accumulator.right_node, access_method
+            )
         )
 
     def ignore_block_comment(self):
@@ -361,8 +387,14 @@ class Parser:
                         Token(T_DOT),
                         VarAccessNode(key),
                     )
+                    access_method = T_DOT
                     res = self.get_keys(
-                        accumulator, res, end_tok, disable_assignment=True
+                        accumulator,
+                        access_method,
+                        res,
+                        end_tok,
+                        disable_assignment=True,
+                        disable_dot=True,
                     )
                     return res
             return res.success(
@@ -451,8 +483,13 @@ class Parser:
                         Token(T_DOT),
                         VarAccessNode(key),
                     )
+                    access_method = T_DOT
                     res = self.get_keys(
-                        accumulator, res, end_tok, disable_assignment=True
+                        accumulator,
+                        access_method,
+                        res,
+                        end_tok,
+                        disable_assignment=True,
                     )
                     return res
                 if self.current_tok.type == T_DOT:
@@ -468,8 +505,13 @@ class Parser:
                         Token(T_DOT),
                         VarAccessNode(key),
                     )
+                    access_method = T_DOT
                     res = self.get_keys(
-                        accumulator, res, end_tok, disable_assignment=True
+                        accumulator,
+                        access_method,
+                        res,
+                        end_tok,
+                        disable_assignment=True,
                     )
                     return res
             return res.success(
@@ -585,8 +627,6 @@ class Parser:
                 if self.current_tok.type == T_STRING:
                     res.register_recession()
                     self.recede()
-                    res.register_recession()
-                    self.recede()
                 else:
                     accumulator = BinOpNode(
                         VarAccessNode(var_name),
@@ -595,7 +635,8 @@ class Parser:
                     )
                     res.register_advancement()
                     self.advance()
-                    res = self.get_keys(accumulator, res, var_name)
+                    access_method = T_DOT
+                    res = self.get_keys(accumulator, access_method, res, var_name)
                     return res
 
             elif self.current_tok.type == T_LSQUARE:
@@ -604,11 +645,16 @@ class Parser:
                 inner_key = res.register(self.expression())
                 if res.error or inner_key is None:
                     return res
-                accumulator = BinOpNode(
-                    VarAccessNode(var_name),
-                    Token(T_DOT),
-                    VarAccessNode(inner_key.tok),
-                )
+                if isinstance(inner_key, VarAccessNode):
+                    accumulator = BinOpNode(
+                        VarAccessNode(var_name), Token(T_LSQUARE), inner_key
+                    )
+                else:
+                    accumulator = BinOpNode(
+                        VarAccessNode(var_name),
+                        Token(T_LSQUARE),
+                        VarAccessNode(inner_key.tok),
+                    )
                 if self.current_tok.type != T_RSQUARE:
                     return res.failure(
                         InvalidSyntaxError(
@@ -620,7 +666,8 @@ class Parser:
                     )
                 res.register_advancement()
                 self.advance()
-                res = self.get_keys(accumulator, res, var_name)
+                access_method = T_LSQUARE
+                res = self.get_keys(accumulator, access_method, res, var_name)
                 return res
 
             res.register_recession()

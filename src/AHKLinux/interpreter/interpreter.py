@@ -1,3 +1,4 @@
+from base_classes.nodes import StringNode
 from constants import *
 from data_types.array import Array
 from data_types.associative_array import AssociativeArray
@@ -165,12 +166,30 @@ class Interpreter:
                 result.set_context(context).set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
             elif isinstance(left, AssociativeArray):
+                if isinstance(node.right_node, StringNode):
+                    return res.failure(
+                        RunTimeError(
+                            node.pos_start,
+                            node.pos_end,
+                            "{} is not a String.".format(left),
+                            context,
+                        )
+                    )
                 result, error = left.get(node.right_node.var_name_tok.value)
                 if error or result is None:
                     return res.failure(error)
                 result.set_context(context).set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
-            elif isinstance(left, Array):
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "The object accessed is not a string or an Associative Array.",
+                    context,
+                )
+            )
+        elif node.op_tok.type == T_LSQUARE:
+            if isinstance(left, Array):
                 if isinstance(node.right_node.var_name_tok.value, int):
                     result, error = left.get(node.right_node.var_name_tok.value)
                     if error or result is None:
@@ -185,6 +204,31 @@ class Interpreter:
                         context,
                     )
                 )
+            elif isinstance(left, String):
+                right = res.register(self.visit(node.right_node, context))
+                if res.error:
+                    return res
+                result, error = left.concatenated_to(right)
+                if error or result is None:
+                    return res.failure(error)
+                result.set_context(context).set_pos(node.pos_start, node.pos_end)
+                return res.success(result)
+            elif isinstance(left, AssociativeArray):
+                if node.right_node.var_name_tok.type == T_IDENTIFIER:
+                    right = res.register(self.visit(node.right_node, context))
+                    if res.error:
+                        return res
+                    result, error = left.get(right.value)
+                    if error or result is None:
+                        return res.failure(error)
+                    result.set_context(context).set_pos(node.pos_start, node.pos_end)
+                    return res.success(result)
+                result, error = left.get(node.right_node.var_name_tok.value)
+                if error or result is None:
+                    return res.failure(error)
+                result.set_context(context).set_pos(node.pos_start, node.pos_end)
+                return res.success(result)
+
             return res.failure(
                 RunTimeError(
                     node.pos_start,
@@ -193,6 +237,7 @@ class Interpreter:
                     context,
                 )
             )
+
         elif node.op_tok.matches(T_KEYWORD, "and") or node.op_tok.matches(
             T_KEYWORD, "or"
         ):
@@ -213,6 +258,20 @@ class Interpreter:
         if res.error:
             return res
         if isinstance(compiled_access_node, AssociativeArray):
+            if node.access_method == T_LSQUARE:
+                if node.key.var_name_tok.type == T_IDENTIFIER:
+                    right = res.register(self.visit(node.key, context))
+                    if res.error:
+                        return res
+                    compiled_access_node.set(right.value, compiled_value)
+                    compiled_value.set_context(context).set_pos(
+                        node.pos_start, node.pos_end
+                    )
+                    return res.success(
+                        "Key '{}' was assigned the value {}.".format(
+                            node.key.var_name_tok.value, compiled_value
+                        )
+                    )
             compiled_access_node.set(node.key.var_name_tok.value, compiled_value)
             compiled_value.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(
@@ -259,6 +318,25 @@ class Interpreter:
             return res
 
         if isinstance(compiled_access_node, AssociativeArray):
+            if node.access_method == T_LSQUARE:
+                if node.key.var_name_tok.type == T_IDENTIFIER:
+                    right = res.register(self.visit(node.key, context))
+                    if res.error:
+                        return res
+                    value, error = compiled_access_node.get(right.value)
+                    if error or value is None:
+                        return res.failure(error)
+                    value.set_context(context).set_pos(node.pos_start, node.pos_end)
+                    return res.success(value)
+            if isinstance(node.key, StringNode):
+                return res.failure(
+                    RunTimeError(
+                        node.pos_start,
+                        node.pos_end,
+                        "{} is not a String.".format(compiled_access_node),
+                        context,
+                    )
+                )
             value, error = compiled_access_node.get(node.key.var_name_tok.value)
             if error or value is None:
                 return res.failure(error)

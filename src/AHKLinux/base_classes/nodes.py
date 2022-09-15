@@ -100,9 +100,10 @@ class VarAccessNode:
 
 
 class ObjectAssignNode:
-    def __init__(self, access_node, key, value_node):
+    def __init__(self, access_node, key, access_method, value_node):
         self.access_node = access_node
         self.key = key
+        self.access_method = access_method
         self.value_node = value_node
         self.pos_start = self.access_node.pos_start
         self.pos_end = self.access_node.pos_end
@@ -112,9 +113,10 @@ class ObjectAssignNode:
 
 
 class ObjectAccessNode:
-    def __init__(self, access_node, key):
+    def __init__(self, access_node, key, access_method):
         self.access_node = access_node
         self.key = key
+        self.access_method = access_method
         self.pos_start = self.access_node.pos_start
         self.pos_end = self.access_node.pos_end
 
