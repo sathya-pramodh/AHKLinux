@@ -355,6 +355,15 @@ class Interpreter:
 
         if isinstance(compiled_access_node, Array):
             if isinstance(node.key.var_name_tok.value, int):
+                if node.access_method == T_DOT:
+                    return res.failure(
+                        RunTimeError(
+                            node.pos_start,
+                            node.pos_end,
+                            "Cannot use '.' for this operation.",
+                            context,
+                        )
+                    )
                 value, error = compiled_access_node.get(node.key.var_name_tok.value)
                 if error or value is None:
                     return res.failure(error)
