@@ -1,10 +1,13 @@
-from base_classes.nodes import StringNode
+from base_classes.nodes import StringNode, VarAccessNode, ReturnNode
+from base_classes.context import Context
+from base_classes.symbol_table import SymbolTable
 from constants import *
 from data_types.array import Array
 from data_types.associative_array import AssociativeArray
 from data_types.boolean import Boolean
 from data_types.number import Number
 from data_types.string import String
+from data_types.function import Function
 from error_classes.runtime_error import RunTimeError
 from interpreter.runtime_result import RuntimeResult
 
@@ -70,7 +73,7 @@ class Interpreter:
             .set_context(context)
             .set_pos(node.pos_start, node.pos_end)
         )
-        return RuntimeResult().success(obj)
+        return res.success(obj)
 
     def visit_VarAccessNode(self, node, context):
         res = RuntimeResult()
@@ -249,6 +252,55 @@ class Interpreter:
             result.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(result)
 
+    def visit_UnaryOpNode(self, node, context):
+        res = RuntimeResult()
+        number = res.register(self.visit(node.node, context))
+        if res.error:
+            return res
+
+        if node.op_tok.matches(T_KEYWORD, "not"):
+            if number.boolean:
+                boolean = (
+                    Boolean("false")
+                    .set_context(context)
+                    .set_pos(node.pos_start, node.pos_end)
+                )
+                return res.success(boolean)
+            boolean = (
+                Boolean("true")
+                .set_context(context)
+                .set_pos(node.pos_start, node.pos_end)
+            )
+            return res.success(boolean)
+
+        if node.op_tok.type == T_MINUS:
+            if number.type == T_HEXADECIMAL:
+                number, error = number.multiplied_by(Number("-0x1", T_HEXADECIMAL))
+                if error:
+                    return res.failure(error)
+            else:
+                number, error = number.multiplied_by(Number(-1, T_DECIMAL))
+                if error:
+                    return res.failure(error)
+        number.set_pos(node.pos_start, node.pos_end)
+        return res.success(number)
+
+    def visit_TernaryOpNode(self, node, context):
+        res = RuntimeResult()
+        condition = res.register(self.visit(node.condition_node, context))
+        if res.error:
+            return res
+        if condition.boolean:
+            compiled_true_node = res.register(self.visit(node.true_node, context))
+            if res.error:
+                return res
+            return res.success(compiled_true_node)
+        else:
+            compiled_false_node = res.register(self.visit(node.false_node, context))
+            if res.error:
+                return res
+            return res.success(compiled_false_node)
+
     def visit_ObjectAssignNode(self, node, context):
         res = RuntimeResult()
         compiled_access_node = res.register(self.visit(node.access_node, context))
@@ -387,39 +439,6 @@ class Interpreter:
             )
         )
 
-    def visit_UnaryOpNode(self, node, context):
-        res = RuntimeResult()
-        number = res.register(self.visit(node.node, context))
-        if res.error:
-            return res
-
-        if node.op_tok.matches(T_KEYWORD, "not"):
-            if number.boolean:
-                boolean = (
-                    Boolean("false")
-                    .set_context(context)
-                    .set_pos(node.pos_start, node.pos_end)
-                )
-                return res.success(boolean)
-            boolean = (
-                Boolean("true")
-                .set_context(context)
-                .set_pos(node.pos_start, node.pos_end)
-            )
-            return res.success(boolean)
-
-        if node.op_tok.type == T_MINUS:
-            if number.type == T_HEXADECIMAL:
-                number, error = number.multiplied_by(Number("-0x1", T_HEXADECIMAL))
-                if error:
-                    return res.failure(error)
-            else:
-                number, error = number.multiplied_by(Number(-1, T_DECIMAL))
-                if error:
-                    return res.failure(error)
-        number.set_pos(node.pos_start, node.pos_end)
-        return res.success(number)
-
     def visit_IfNode(self, node, context):
         res = RuntimeResult()
         condition = res.register(self.visit(node.condition_node, context))
@@ -455,3 +474,79 @@ class Interpreter:
                 return res
             outputs.append(result)
         return res.success(outputs)
+
+    def visit_FunctionDeclareNode(self, node, context):
+        res = RuntimeResult()
+        for parameter in node.parameters:
+            if not isinstance(parameter, VarAccessNode):
+                return res.failure(
+                    RunTimeError(
+                        node.pos_start,
+                        node.pos_end,
+                        "Expected identifiers as parameters inside function declaration.",
+                        context,
+                    )
+                )
+        result = (
+            Function(node.name.value, node.parameters, node.statements)
+            .set_pos(node.pos_start, node.pos_end)
+            .set_context(context)
+        )
+        context.symbol_table.set(node.name.value, result)
+        return res.success(
+            "Function with name '{}' has been declared.".format(node.name.value)
+        )
+
+    def visit_FunctionCallNode(self, node, context):
+        res = RuntimeResult()
+        func = context.symbol_table.get(node.name.value)
+        if len(node.parameters) != len(func.parameters):
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "Parameter mismatch. Function call misses one or more required parameters.",
+                    context,
+                )
+            )
+        function_context = Context(node.name.value)
+        function_context.parent = context
+        function_context.parent_entry_pos = node.pos_start
+        function_context.symbol_table = SymbolTable({})
+        function_context.symbol_table.parent = context.symbol_table
+        idx = 0
+        for parameter in func.parameters:
+            param_value = res.register(
+                self.visit(node.parameters[idx], function_context)
+            )
+            if res.error:
+                return res
+            param_value.set_pos(node.pos_start, node.pos_end).set_context(
+                function_context
+            )
+            function_context.symbol_table.set(parameter.var_name_tok.value, param_value)
+            idx += 1
+
+        for statement in func.statements:
+            result = res.register(self.visit(statement, function_context))
+            if res.error:
+                return res
+            if isinstance(statement, ReturnNode):
+                return res.success(result)
+        return res.success(String(""))
+
+    def visit_ReturnNode(self, node, context):
+        res = RuntimeResult()
+        if context.parent is None:
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "Return statement cannot be used here.",
+                    context,
+                )
+            )
+        value = res.register(self.visit(node.node, context))
+        if res.error:
+            return res
+        return res.success(value)

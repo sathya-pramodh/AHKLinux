@@ -42,6 +42,12 @@ class Lexer:
                     self.advance()
                 continue
 
+            elif self.current_char == "?":
+                tokens.append(Token(T_QUESTION_MARK, pos_start=self.pos))
+
+            elif self.current_char == "%":
+                tokens.append(Token(T_PERCENT, pos_start=self.pos))
+
             elif self.current_char == "\n":
                 tokens.append(Token(T_EOL, pos_start=self.pos))
 
@@ -120,7 +126,7 @@ class Lexer:
 
             elif self.current_char in DIGITS:
                 result, error = self.make_number()
-                if error:
+                if error or result is None:
                     return [], error
                 tokens.append(result)
                 continue
@@ -232,8 +238,18 @@ class Lexer:
     def make_string(self):
         string_value = ""
         pos_start = self.pos.copy()
-        while self.current_char is not None and self.current_char != '"':
-            string_value += self.current_char
-            self.advance()
-
+        while True:
+            if self.current_char is None:
+                break
+            elif self.current_char == '"':
+                next_char = self.get_next_char(self.pos.idx)
+                if next_char == '"':
+                    self.advance()
+                    self.advance()
+                    string_value += '"'
+                else:
+                    break
+            else:
+                string_value += self.current_char
+                self.advance()
         return Token(T_STRING, string_value, pos_start)

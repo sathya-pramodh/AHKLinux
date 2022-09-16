@@ -1,23 +1,31 @@
 """
 Grammar:
     expression: (KEYWORD:global)* IDENTIFIER ASSIGNMENT expression
-              : (KEYWORD:global)* IDENTIFIER
+              : return-expr
+              : function-call-expr
               : if-expr
               : term (PLUS|MINUS term)*
               : STRING (DOT STRING)*
               : IDENTIFIER (DOT IDENTIFIER)* (LSQUARE (expression)? RSQUARE)* (ASSIGNMENT expression)*
+              : term QUESTION_MARK expression COLON expression
     term: factor (MULTIPLY|DIVIDE factor)*
     factor: (PLUS|MINUS) factor
           : (KEYWORD:not) expression
           : atom
     atom : DECIMAL|HEXADECIMAL|FLOAT|STRING|BOOLEAN
+         : IDENTIFIER
+         : PERCENT IDENTIFIER PERCENT
          : LPAREN expr RPAREN
          : array-expr
          : associative-array-expr
+         : function-declare-expr
          : block-comment
     array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE (LSQUARE (expression)? RSQUARE)*
     associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE (LSQUARE (expression)? RSQUARE)*
     if-expr : KEYWORD:if expression (KEYWORD:and|or expression)* LCURVE expression (EOL expression)* (KEYWORD:else LCURVE expression (EOL expression)* RCURVE)?
+    function-declare-expr : IDENTIFIER LPAREN (IDENTIFIER (COMMA IDENTIFIER)*)? RPAREN LCURVE (expression (\n expression)*)* RCURVE
+    function-call-expr : IDENTIFIER LPAREN (expression (COMMA expression)*)? RPAREN
+    return-expr : KEYWORD:return expression
     block-comment : BCOMMENT_START .* BCOMMENT_END
 """
 from constants import *
@@ -294,6 +302,74 @@ class Parser:
             )
         return res.success(IfNode(condition_node, expressions))
 
+    def function_expr(self, var_name):
+        res = ParseResult()
+        res.register_advancement()
+        self.advance()
+        params = []
+        if self.current_tok.type == T_RPAREN:
+            res.register_advancement()
+            self.advance()
+        else:
+            node = res.register(self.expression())
+            params.append(node)
+            while self.current_tok.type == T_COMMA:
+                res.register_advancement()
+                self.advance()
+                node = res.register(self.expression())
+                if res.error:
+                    return res
+                params.append(node)
+            if self.current_tok.type != T_RPAREN:
+                return res.failure(
+                    InvalidSyntaxError(
+                        var_name.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected ')'.",
+                        self.context,
+                    )
+                )
+            res.register_advancement()
+            self.advance()
+            if self.current_tok.type == T_EOL:
+                res.register_advancement()
+                self.advance()
+        if self.current_tok.type == T_LCURVE:
+            res.register_advancement()
+            self.advance()
+            if self.current_tok.type == T_EOL:
+                res.register_advancement()
+                self.advance()
+            expressions = []
+            self.context.display_name = var_name.value
+            expr = res.register(self.expression())
+            if res.error:
+                return res
+            expressions.append(expr)
+            while self.current_tok.type == T_EOL:
+                res.register_advancement()
+                self.advance()
+                if self.current_tok.type == T_RCURVE:
+                    break
+                expr = res.register(self.expression())
+                if res.error:
+                    return res
+                expressions.append(expr)
+            if self.current_tok.type != T_RCURVE:
+                return res.failure(
+                    InvalidSyntaxError(
+                        var_name.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '}'.",
+                        self.context,
+                    )
+                )
+            res.register_advancement()
+            self.advance()
+            self.context.display_name = "<module>"
+            return res.success(FunctionDeclareNode(var_name, params, expressions))
+        return res.success(FunctionCallNode(var_name, params))
+
     def atom(self):
         res = ParseResult()
         tok = self.current_tok
@@ -317,6 +393,35 @@ class Parser:
             res.register_advancement()
             self.advance()
             return res.success(VarAccessNode(tok))
+
+        elif self.current_tok.type == T_PERCENT:
+            pos_start = self.current_tok.pos_start
+            res.register_advancement()
+            self.advance()
+            if self.current_tok.type != T_IDENTIFIER:
+                return res.failure(
+                    InvalidSyntaxError(
+                        pos_start,
+                        self.current_tok.pos_end,
+                        "Expected identifier after '%'.",
+                        self.context,
+                    )
+                )
+            var_name = self.current_tok
+            res.register_advancement()
+            self.advance()
+            if self.current_tok.type != T_PERCENT:
+                return res.failure(
+                    InvalidSyntaxError(
+                        pos_start,
+                        self.current_tok.pos_end,
+                        "Expected '%'.",
+                        self.context,
+                    )
+                )
+            res.register_advancement()
+            self.advance()
+            return res.success(VarAccessNode(var_name))
 
         elif tok.type == T_LPAREN:
             res.register_advancement()
@@ -342,16 +447,18 @@ class Parser:
                 res.register_advancement()
                 self.advance()
             else:
-                value_nodes.append(res.register(self.expression()))
+                value_node = res.register(self.expression())
                 if res.error:
                     return res
+                value_nodes.append(value_node)
 
                 while self.current_tok.type == T_COMMA:
                     res.register_advancement()
                     self.advance()
-                    value_nodes.append(res.register(self.expression()))
-                    if res.error:
+                    value_node = res.register(self.expression())
+                    if res.error or value_node is None:
                         return res
+                    value_nodes.append(value_node)
 
                 if self.current_tok.type != T_RSQUARE:
                     return res.failure(
@@ -387,7 +494,7 @@ class Parser:
                         Token(T_DOT),
                         VarAccessNode(key),
                     )
-                    access_method = T_DOT
+                    access_method = T_LSQUARE
                     res = self.get_keys(
                         accumulator,
                         access_method,
@@ -483,7 +590,7 @@ class Parser:
                         Token(T_DOT),
                         VarAccessNode(key),
                     )
-                    access_method = T_DOT
+                    access_method = T_LSQUARE
                     res = self.get_keys(
                         accumulator,
                         access_method,
@@ -519,10 +626,6 @@ class Parser:
                     value_nodes, tok.pos_start, self.current_tok.pos_end
                 )
             )
-        elif tok.type in (T_EOL, T_EOF, T_SOF):
-            res.register_advancement()
-            self.advance()
-            return res
 
         elif tok.type == T_BCOMMENT_START:
             self.recede()
@@ -539,7 +642,7 @@ class Parser:
             InvalidSyntaxError(
                 tok.pos_start,
                 tok.pos_end,
-                "Expected int, float, hexadecimal, string, an object or a comment.",
+                "Expected int, float, hexadecimal, string, or an object.",
                 self.context,
             )
         )
@@ -607,6 +710,14 @@ class Parser:
             res = self.if_expr(pos_start)
             return res
 
+        elif self.current_tok.matches(T_KEYWORD, "return"):
+            res.register_advancement()
+            self.advance()
+            node = res.register(self.expression())
+            if res.error:
+                return res
+            return res.success(ReturnNode(node))
+
         elif self.current_tok.type == T_IDENTIFIER:
             var_name = self.current_tok
             res.register_advancement()
@@ -643,7 +754,7 @@ class Parser:
                 res.register_advancement()
                 self.advance()
                 inner_key = res.register(self.expression())
-                if res.error or inner_key is None:
+                if res.error:
                     return res
                 if isinstance(inner_key, VarAccessNode):
                     accumulator = BinOpNode(
@@ -670,6 +781,10 @@ class Parser:
                 res = self.get_keys(accumulator, access_method, res, var_name)
                 return res
 
+            elif self.current_tok.type == T_LPAREN:
+                res = self.function_expr(var_name)
+                return res
+
             res.register_recession()
             self.recede()
 
@@ -678,6 +793,27 @@ class Parser:
             self.advance()
             return res
         node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_DOT, T_KEYWORD)))
-        if res.error:
+        if res.error or node is None:
             return res
+        if self.current_tok.type == T_QUESTION_MARK:
+            res.register_advancement()
+            self.advance()
+            true_node = res.register(self.expression())
+            if res.error:
+                return res
+            if self.current_tok.type != T_COLON:
+                return res.failure(
+                    InvalidSyntaxError(
+                        node.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected ':'.",
+                        self.context,
+                    )
+                )
+            res.register_advancement()
+            self.advance()
+            false_node = res.register(self.expression())
+            if res.error:
+                return res
+            return res.success(TernaryOpNode(node, true_node, false_node))
         return res.success(node)

@@ -1,15 +1,21 @@
 from base_classes.value import Value
+from constants import ESCAPE_CHARS
 from error_classes.runtime_error import RunTimeError
 
 
 class String(Value):
     def __init__(self, value):
         super().__init__()
-        self.value = value
+        self.value = self.replace_escape_chars(value)
         self.boolean = True if self.value else False
 
+    def replace_escape_chars(self, value):
+        for key_, value_ in ESCAPE_CHARS.items():
+            value = value.replace(key_, value_)
+        return value
+
     def concatenated_to(self, other):
-        if not isinstance(other, String):
+        if not isinstance(other, String) or self.value is None or other.value is None:
             return None, RunTimeError(
                 self.pos_start,
                 self.pos_end,

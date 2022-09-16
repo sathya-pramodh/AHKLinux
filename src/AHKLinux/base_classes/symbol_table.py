@@ -1,7 +1,6 @@
 class SymbolTable:
     def __init__(self, symbols={}):
         self.symbols = symbols
-        self.child = None
         self.parent = None
 
     def get(self, name):
@@ -11,7 +10,7 @@ class SymbolTable:
         return value
 
     def set(self, name, value, global_=False):
-        if global_ and self.parent:
+        if global_ and self.parent is not None:
             self.parent.symbols[name] = value
         else:
             self.symbols[name] = value

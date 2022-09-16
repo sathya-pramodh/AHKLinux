@@ -9,30 +9,16 @@ class Array(Value):
         self.boolean = True if self.value else False
 
     def set(self, idx, value):
-        if str(idx).find(".") != -1:
-            return 1, RunTimeError(
-                self.pos_start,
-                self.pos_end,
-                "Expected an integer for an array index.",
-                self.context,
-            )
-        if int(idx) < len(self.value) and int(idx) >= 0:
-            self.value[int(idx)] = value
+        if int(idx) - 1 < len(self.value) and int(idx) - 1 >= 0:
+            self.value[int(idx) - 1] = value
             return 0, None
         return 1, RunTimeError(
             self.pos_start, self.pos_end, "Index out of range.", self.context
         )
 
     def get(self, idx):
-        if str(idx).find(".") != -1:
-            return None, RunTimeError(
-                self.pos_start,
-                self.pos_end,
-                "Expected an integer for an array index.",
-                self.context,
-            )
-        if int(idx) < len(self.value) and int(idx) >= 0:
-            return self.value[int(idx)], None
+        if int(idx) - 1 < len(self.value) and int(idx) - 1 >= 0:
+            return self.value[int(idx) - 1], None
         return None, RunTimeError(
             self.pos_start, self.pos_end, "Index out of range.", self.context
         )

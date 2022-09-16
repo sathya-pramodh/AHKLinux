@@ -76,6 +76,18 @@ class UnaryOpNode:
         return f"({self.op_tok}, {self.node})"
 
 
+class TernaryOpNode:
+    def __init__(self, condition_node, true_node, false_node):
+        self.condition_node = condition_node
+        self.true_node = true_node
+        self.false_node = false_node
+        self.pos_start = self.condition_node.pos_start
+        self.pos_end = self.false_node.pos_end
+
+    def __repr__(self):
+        return f"{self.condition_node} ? {self.true_node}:{self.false_node}"
+
+
 class VarAssignNode:
     def __init__(self, var_name, value_node, scope="local"):
         self.var_name = var_name
@@ -154,3 +166,38 @@ class IfElseNode:
 
     def __repr__(self):
         return f"if {self.condition_node} then {self.statements} else {self.else_statements}"
+
+
+class FunctionDeclareNode:
+    def __init__(self, name, parameters, statements):
+        self.name = name
+        self.parameters = parameters
+        self.statements = statements
+        self.pos_start = name.pos_start
+        self.pos_end = self.statements[-1].pos_end
+
+    def __repr__(self):
+        return r"{}({}){{}}".format(self.name, self.parameters, self.statements)
+
+
+class FunctionCallNode:
+    def __init__(self, name, parameters):
+        self.name = name
+        self.parameters = parameters
+        self.pos_start = name.pos_start
+        self.pos_end = (
+            self.parameters[-1].pos_end if self.parameters != [] else name.pos_end
+        )
+
+    def __repr__(self):
+        return r"{}({})".format(self.name, self.parameters)
+
+
+class ReturnNode:
+    def __init__(self, node):
+        self.node = node
+        self.pos_start = self.node.pos_start
+        self.pos_end = self.node.pos_end
+
+    def __repr__(self):
+        return r"{self.node}"
