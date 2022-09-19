@@ -16,12 +16,16 @@ class Error:
         pos = self.pos_start
         context = self.context
 
-        while context:
-            result += "  File: '{}', line {}, in {}\n".format(
+        def get_call_stack(context, pos, result):
+            if not context:
+                return result
+            result = get_call_stack(context.parent, context.parent_entry_pos, result)
+            result += " File: '{}', line {}, in {}\n".format(
                 pos.filename, pos.line, context.display_name
             )
             result += "    {}\n".format(pos.ftext.strip().split("\n")[pos.line - 1])
-            pos = context.parent_entry_pos
-            context = context.parent
+            return result
+
+        result = get_call_stack(context, pos, result)
 
         return "Traceback (most recent call last):\n" + result
