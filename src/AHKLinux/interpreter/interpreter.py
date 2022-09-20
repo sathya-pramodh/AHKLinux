@@ -516,9 +516,7 @@ class Interpreter:
         function_context.symbol_table.parent = context.symbol_table
         idx = 0
         for parameter in func.parameters:
-            param_value = res.register(
-                self.visit(node.parameters[idx], function_context)
-            )
+            param_value = res.register(self.visit(node.parameters[idx], context))
             if res.error:
                 return res
             param_value.set_pos(node.pos_start, node.pos_end).set_context(
@@ -528,16 +526,21 @@ class Interpreter:
             idx += 1
 
         for statement in func.statements:
-            result = res.register(self.visit(statement, function_context))
+            if isinstance(statement, ReturnNode):
+                result = res.register(self.visit(statement, function_context))
+                if res.error:
+                    return res
+                return res.success(result)
+            res.register(self.visit(statement, function_context))
             if res.error:
                 return res
-            if isinstance(statement, ReturnNode):
-                return res.success(result)
         return res.success(String(""))
 
     def visit_ReturnNode(self, node, context):
         res = RuntimeResult()
-        if context.parent is None:
+        if context.display_name == "<module>":
+            if node.node is None:
+                return res.success(String(""))
             return res.failure(
                 RunTimeError(
                     node.pos_start,
@@ -546,7 +549,10 @@ class Interpreter:
                     context,
                 )
             )
-        value = res.register(self.visit(node.node, context))
+        if node.node is None:
+            value = String("")
+        else:
+            value = res.register(self.visit(node.node, context))
         if res.error:
             return res
         return res.success(value)

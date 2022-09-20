@@ -196,8 +196,8 @@ class FunctionCallNode:
 class ReturnNode:
     def __init__(self, node):
         self.node = node
-        self.pos_start = self.node.pos_start
-        self.pos_end = self.node.pos_end
+        self.pos_start = self.node.pos_start if self.node is not None else None
+        self.pos_end = self.node.pos_end if self.node is not None else None
 
     def __repr__(self):
-        return r"{self.node}"
+        return f"return {self.node}"

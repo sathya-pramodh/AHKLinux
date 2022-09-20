@@ -2,7 +2,6 @@
 Grammar:
     expression: (KEYWORD:global)* IDENTIFIER ASSIGNMENT expression
               : return-expr
-              : function-call-expr
               : if-expr
               : term (PLUS|MINUS term)*
               : STRING (DOT STRING)*
@@ -18,13 +17,12 @@ Grammar:
          : LPAREN expr RPAREN
          : array-expr
          : associative-array-expr
-         : function-declare-expr
+         : function-expr
          : block-comment
     array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE (LSQUARE (expression)? RSQUARE)*
     associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE (LSQUARE (expression)? RSQUARE)*
     if-expr : KEYWORD:if expression (KEYWORD:and|or expression)* LCURVE expression (EOL expression)* (KEYWORD:else LCURVE expression (EOL expression)* RCURVE)?
-    function-declare-expr : IDENTIFIER LPAREN (IDENTIFIER (COMMA IDENTIFIER)*)? RPAREN LCURVE (expression (\n expression)*)* RCURVE
-    function-call-expr : IDENTIFIER LPAREN (expression (COMMA expression)*)? RPAREN
+    function-expr : IDENTIFIER LPAREN (expression (COMMA expression)*)? RPAREN (LCURVE (expression (\n expression)*)* RCURVE)?
     return-expr : KEYWORD:return expression
     block-comment : BCOMMENT_START .* BCOMMENT_END
 """
@@ -304,8 +302,6 @@ class Parser:
 
     def function_expr(self, var_name):
         res = ParseResult()
-        res.register_advancement()
-        self.advance()
         params = []
         if self.current_tok.type == T_RPAREN:
             res.register_advancement()
@@ -331,9 +327,9 @@ class Parser:
                 )
             res.register_advancement()
             self.advance()
-            if self.current_tok.type == T_EOL:
-                res.register_advancement()
-                self.advance()
+        if self.current_tok.type == T_EOL:
+            res.register_advancement()
+            self.advance()
         if self.current_tok.type == T_LCURVE:
             res.register_advancement()
             self.advance()
@@ -392,6 +388,11 @@ class Parser:
         elif tok.type == T_IDENTIFIER:
             res.register_advancement()
             self.advance()
+            if self.current_tok.type == T_LPAREN:
+                res.register_advancement()
+                self.advance()
+                res = self.function_expr(tok)
+                return res
             return res.success(VarAccessNode(tok))
 
         elif self.current_tok.type == T_PERCENT:
@@ -666,7 +667,7 @@ class Parser:
         return self.atom()
 
     def term(self):
-        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_DOT, T_KEYWORD))
+        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_DOT))
 
     def expression(self):
         res = ParseResult()
@@ -781,10 +782,6 @@ class Parser:
                 res = self.get_keys(accumulator, access_method, res, var_name)
                 return res
 
-            elif self.current_tok.type == T_LPAREN:
-                res = self.function_expr(var_name)
-                return res
-
             res.register_recession()
             self.recede()
 
@@ -792,7 +789,7 @@ class Parser:
             res.register_advancement()
             self.advance()
             return res
-        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_DOT, T_KEYWORD)))
+        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_DOT)))
         if res.error or node is None:
             return res
         if self.current_tok.type == T_QUESTION_MARK:
