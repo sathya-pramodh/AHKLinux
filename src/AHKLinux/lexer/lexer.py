@@ -42,6 +42,13 @@ class Lexer:
                     self.advance()
                 continue
 
+            elif self.current_char == "=":
+                tokens.append(Token(T_L_ASSIGNMENT, pos_start=self.pos))
+                self.advance()
+                string_tok = self.make_u_string()
+                tokens.append(string_tok)
+                continue
+
             elif self.current_char == "?":
                 tokens.append(Token(T_QUESTION_MARK, pos_start=self.pos))
 
@@ -253,3 +260,13 @@ class Lexer:
                 string_value += self.current_char
                 self.advance()
         return Token(T_STRING, string_value, pos_start)
+
+    def make_u_string(self):
+        string_value = ""
+        pos_start = self.pos.copy()
+        while True:
+            if self.current_char is None or self.current_char == "\n":
+                break
+            string_value += self.current_char
+            self.advance()
+        return Token(T_U_STRING, string_value, pos_start)

@@ -671,6 +671,7 @@ class Parser:
 
     def expression(self):
         res = ParseResult()
+
         if self.current_tok.matches(T_KEYWORD, "global"):
             res.register_advancement()
             self.advance()
@@ -731,6 +732,23 @@ class Parser:
                 if res.error:
                     return res
                 return res.success(VarAssignNode(var_name, expr))
+
+            elif self.current_tok.type == T_L_ASSIGNMENT:
+                res.register_advancement()
+                self.advance()
+                if self.current_tok.type != T_U_STRING:
+                    return res.failure(
+                        InvalidSyntaxError(
+                            var_name.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected unquoted string.",
+                            self.context,
+                        )
+                    )
+                value_node = StringNode(self.current_tok)
+                res.register_advancement()
+                self.advance()
+                return res.success(VarAssignNode(var_name, value_node))
 
             elif self.current_tok.type == T_DOT:
                 op_tok = self.current_tok

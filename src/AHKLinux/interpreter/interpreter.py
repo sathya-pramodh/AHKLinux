@@ -114,6 +114,24 @@ class Interpreter:
             "'{}' has been assigned the value {}.".format(var_name, var_value)
         )
 
+    def visit_L_VarAssignNode(self, node, context):
+        res = RuntimeResult()
+        var_name = node.var_name.value
+        var_values = []
+        for var_node in node.var_nodes:
+            var_value = res.register(self.visit(var_node, context))
+            if res.error:
+                return res
+            var_values.append(var_value)
+        node.string_node.tok.value.format(*var_values)
+        value = res.register(self.visit(node.string_node, context))
+        if res.error:
+            return res
+        context.symbol_table.set(var_name, value)
+        return res.success(
+            "'{}' has been assigned the value {}.".format(var_name, value)
+        )
+
     def visit_BinOpNode(self, node, context):
         res = RuntimeResult()
         left = res.register(self.visit(node.left_node, context))

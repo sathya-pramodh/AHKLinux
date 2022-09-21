@@ -101,6 +101,18 @@ class VarAssignNode:
         return f"{self.var_name}:{self.value_node}"
 
 
+class L_VarAssignNode:
+    def __init__(self, var_name, string_node, var_nodes):
+        self.var_name = var_name
+        self.string_node = string_node
+        self.var_nodes = var_nodes
+        self.pos_start = self.var_name.pos_start
+        self.pos_end = self.var_name.pos_end
+
+    def __repr__(self):
+        return f"{self.var_name}:{self.string_node}"
+
+
 class VarAccessNode:
     def __init__(self, var_name_tok):
         self.var_name_tok = var_name_tok
