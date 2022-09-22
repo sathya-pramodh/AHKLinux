@@ -22,10 +22,17 @@ An Interpreter for AutoHotKey on Linux **(planned only for X11)**.
   - Variables
     - Initialization
       - Initialization using ':=' operator to an expression
-      - Initialization using '=' operator to an unquoted string
+      - Initialization using '=' operator to an unquoted string (Legacy)
+      - Initialization to the global scope using the 'global' keyword
     - Access
       - Access from within expressions
       - Access by enclosing in '%' signs to embed into unquoted strings (Legacy)
+ 
+  - Functions
+    - Declaration
+      - Declaration using zero or more parameters
+    - Call
+      - Call using the same number of parameters used during declaration
 
   - Expressions
     - Arithmetic (+,-,*,/)
