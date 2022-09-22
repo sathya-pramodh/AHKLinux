@@ -1,13 +1,15 @@
-from base_classes.nodes import StringNode, VarAccessNode, ReturnNode
+import re
+
 from base_classes.context import Context
+from base_classes.nodes import ReturnNode, StringNode, VarAccessNode
 from base_classes.symbol_table import SymbolTable
 from constants import *
 from data_types.array import Array
 from data_types.associative_array import AssociativeArray
 from data_types.boolean import Boolean
+from data_types.function import Function
 from data_types.number import Number
 from data_types.string import String
-from data_types.function import Function
 from error_classes.runtime_error import RunTimeError
 from interpreter.runtime_result import RuntimeResult
 
@@ -30,6 +32,36 @@ class Interpreter:
         return RuntimeResult().success(number)
 
     def visit_StringNode(self, node, context):
+        if not node.quoted:
+            var_names = re.findall("%[a-zA-Z0-9_@#$]*%", node.tok.value)
+            for var_name in var_names:
+                var_name = var_name.replace("%", "")
+                var_value = context.symbol_table.get(var_name)
+                if var_value is None:
+                    return RuntimeResult().failure(
+                        RunTimeError(
+                            node.pos_start,
+                            node.pos_end,
+                            "'{}' is not defined.".format(var_name),
+                            context,
+                        )
+                    )
+                if not (isinstance(var_value, String) or isinstance(var_value, Number)):
+                    return RuntimeResult().failure(
+                        RunTimeError(
+                            node.pos_start,
+                            node.pos_end,
+                            "'{}' is not a string or a number.".format(var_name),
+                            context,
+                        )
+                    )
+                node.tok.value = re.sub(
+                    "%[a-zA-Z0-9_@#$]*%",
+                    str(var_value),
+                    node.tok.value,
+                    count=1,
+                )
+
         string = (
             String(node.tok.value)
             .set_context(context)

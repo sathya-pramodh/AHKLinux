@@ -395,35 +395,6 @@ class Parser:
                 return res
             return res.success(VarAccessNode(tok))
 
-        elif self.current_tok.type == T_PERCENT:
-            pos_start = self.current_tok.pos_start
-            res.register_advancement()
-            self.advance()
-            if self.current_tok.type != T_IDENTIFIER:
-                return res.failure(
-                    InvalidSyntaxError(
-                        pos_start,
-                        self.current_tok.pos_end,
-                        "Expected identifier after '%'.",
-                        self.context,
-                    )
-                )
-            var_name = self.current_tok
-            res.register_advancement()
-            self.advance()
-            if self.current_tok.type != T_PERCENT:
-                return res.failure(
-                    InvalidSyntaxError(
-                        pos_start,
-                        self.current_tok.pos_end,
-                        "Expected '%'.",
-                        self.context,
-                    )
-                )
-            res.register_advancement()
-            self.advance()
-            return res.success(VarAccessNode(var_name))
-
         elif tok.type == T_LPAREN:
             res.register_advancement()
             self.advance()
@@ -745,7 +716,7 @@ class Parser:
                             self.context,
                         )
                     )
-                value_node = StringNode(self.current_tok)
+                value_node = StringNode(self.current_tok, quoted=False)
                 res.register_advancement()
                 self.advance()
                 return res.success(VarAssignNode(var_name, value_node))

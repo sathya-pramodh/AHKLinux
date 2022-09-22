@@ -12,8 +12,9 @@ class NumberNode:
 
 
 class StringNode:
-    def __init__(self, tok):
+    def __init__(self, tok, quoted=True):
         self.tok = tok
+        self.quoted = quoted
         self.pos_start = self.tok.pos_start
         self.pos_end = self.tok.pos_end
 
