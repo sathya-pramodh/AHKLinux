@@ -110,10 +110,12 @@ class Interpreter:
     def visit_VarAccessNode(self, node, context):
         res = RuntimeResult()
         var_name = node.var_name_tok.value
-        var_value = None
-        for name, value in context.symbol_table.symbols.items():
-            if name.lower() == var_name.lower():
-                var_value = value
+        var_value = context.symbol_table.get(var_name)
+        if (
+            context.parent is not None
+            and context.parent.symbol_table.global_from_child(var_name)
+        ):
+            var_value = context.parent.symbol_table.get(var_name)
 
         if not var_value:
             return res.failure(
@@ -133,14 +135,17 @@ class Interpreter:
         var_value = res.register(self.visit(node.value_node, context))
         if res.error:
             return res
-        for name in context.symbol_table.symbols.keys():
-            if name.lower() == var_name.lower():
-                context.symbol_table.symbols[name] = var_value
-                break
-        if node.scope == "global":
-            context.symbol_table.set(var_name, var_value, global_=True)
+        if node.scope == "global" and context.parent is not None:
+            context.parent.symbol_table.set(var_name, (var_value, True))
         else:
-            context.symbol_table.set(var_name, var_value)
+            if (
+                context.parent is not None
+                and context.parent.symbol_table.global_from_child(var_name)
+            ):
+                context.parent.symbol_table.set(var_name, (var_value, True))
+            else:
+                context.symbol_table.set(var_name, (var_value, False))
+
         var_value.set_context(context).set_pos(node.pos_start, node.pos_end)
         return res.success(
             "'{}' has been assigned the value {}.".format(var_name, var_value)
@@ -159,7 +164,7 @@ class Interpreter:
         value = res.register(self.visit(node.string_node, context))
         if res.error:
             return res
-        context.symbol_table.set(var_name, value)
+        context.symbol_table.set(var_name, (value, False))
         return res.success(
             "'{}' has been assigned the value {}.".format(var_name, value)
         )
@@ -298,7 +303,7 @@ class Interpreter:
             if res.error:
                 return res
             operator = "and" if node.op_tok.matches(T_KEYWORD, "and") else "or"
-            result = left.compare(right, operator)
+            result = left.repr_boolean.compare(right.repr_boolean, operator)
             result.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(result)
 
@@ -496,8 +501,8 @@ class Interpreter:
             return res
         if condition.boolean:
             outputs = []
-            for expr in node.statements:
-                result = res.register(self.visit(expr, context))
+            for statement in node.body:
+                result = res.register(self.visit(statement, context))
                 if res.error:
                     return res
                 outputs.append(result)
@@ -511,15 +516,15 @@ class Interpreter:
             return res
         if condition.boolean:
             outputs = []
-            for expr in node.statements:
-                result = res.register(self.visit(expr, context))
+            for statement in node.if_body:
+                result = res.register(self.visit(statement, context))
                 if res.error:
                     return res
                 outputs.append(result)
             return res.success(outputs)
         outputs = []
-        for expr in node.else_statements:
-            result = res.register(self.visit(expr, context))
+        for statement in node.else_body:
+            result = res.register(self.visit(statement, context))
             if res.error:
                 return res
             outputs.append(result)
@@ -538,11 +543,11 @@ class Interpreter:
                     )
                 )
         result = (
-            Function(node.name.value, node.parameters, node.statements)
+            Function(node.name.value, node.parameters, node.body)
             .set_pos(node.pos_start, node.pos_end)
             .set_context(context)
         )
-        context.symbol_table.set(node.name.value, result)
+        context.symbol_table.set(node.name.value, (result, False))
         return res.success(
             "Function with name '{}' has been declared.".format(node.name.value)
         )
@@ -572,18 +577,17 @@ class Interpreter:
             param_value.set_pos(node.pos_start, node.pos_end).set_context(
                 function_context
             )
-            function_context.symbol_table.set(parameter.var_name_tok.value, param_value)
+            function_context.symbol_table.set(
+                parameter.var_name_tok.value, (param_value, False)
+            )
             idx += 1
 
-        for statement in func.statements:
-            if isinstance(statement, ReturnNode):
-                result = res.register(self.visit(statement, function_context))
-                if res.error:
-                    return res
-                return res.success(result)
-            res.register(self.visit(statement, function_context))
+        for statement in func.body:
+            result = res.register(self.visit(statement, function_context))
             if res.error:
                 return res
+            if isinstance(statement, ReturnNode):
+                return res.success(result)
         return res.success(String(""))
 
     def visit_ReturnNode(self, node, context):

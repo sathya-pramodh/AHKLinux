@@ -35,3 +35,4 @@ LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 KEYWORDS = ["global", "and", "or", "not", "if", "else", "return"]
 BOOLEANS = ["true", "false"]
 ESCAPE_CHARS = {"`n": "\n", "`t": "\t", "`r": "\r"}
+COMMANDS = ["MsgBox"]

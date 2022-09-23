@@ -6,6 +6,7 @@ class Boolean(Value):
         super().__init__()
         self.value = value
         self.boolean = True if self.value == "true" else False
+        self.repr_boolean = self
 
     def compare(self, other, operator):
         if operator == "and":

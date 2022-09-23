@@ -1,4 +1,5 @@
 from base_classes.value import Value
+from data_types.boolean import Boolean
 from constants import DIGITS, LETTERS, T_DECIMAL
 from data_types.number import Number
 from data_types.string import String
@@ -10,6 +11,7 @@ class AssociativeArray(Value):
         super().__init__()
         self.value = value
         self.boolean = True if self.value else False
+        self.repr_boolean = Boolean("true") if self.value else Boolean("false")
 
     def set(self, key, value):
         for key_, value_ in self.value.items():

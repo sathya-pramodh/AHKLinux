@@ -1,4 +1,5 @@
 from base_classes.value import Value
+from data_types.boolean import Boolean
 from constants import ESCAPE_CHARS
 from error_classes.runtime_error import RunTimeError
 
@@ -8,6 +9,7 @@ class String(Value):
         super().__init__()
         self.value = self.replace_escape_chars(value)
         self.boolean = True if self.value else False
+        self.repr_boolean = Boolean("true") if self.value else Boolean("false")
 
     def replace_escape_chars(self, value):
         for key_, value_ in ESCAPE_CHARS.items():

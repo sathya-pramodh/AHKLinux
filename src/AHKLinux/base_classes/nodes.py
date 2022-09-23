@@ -150,47 +150,47 @@ class ObjectAccessNode:
 
 
 class IfNode:
-    def __init__(self, condition_node, statements):
+    def __init__(self, condition_node, if_body):
         self.condition_node = condition_node
-        self.statements = statements
+        self.if_body = if_body
         self.pos_start = self.condition_node.pos_start
         self.pos_end = (
-            self.statements[-1].pos_end
-            if self.statements != []
+            self.if_body[-1].pos_end
+            if self.if_body != []
             else self.condition_node.pos_end
         )
 
     def __repr__(self):
-        return f"if {self.condition_node} then {self.statements}"
+        return f"if {self.condition_node} then {self.if_body}"
 
 
 class IfElseNode:
-    def __init__(self, condition_node, statements, else_statements):
+    def __init__(self, condition_node, if_body, else_body):
         self.condition_node = condition_node
-        self.statements = statements
-        self.else_statements = else_statements
+        self.if_body = if_body
+        self.else_body = else_body
         self.pos_start = self.condition_node.pos_start
-        if self.else_statements != []:
-            self.pos_end = self.else_statements[-1].pos_end
-        elif self.statements != []:
-            self.pos_end = self.statements[-1].pos_end
+        if self.else_body != []:
+            self.pos_end = self.else_body[-1].pos_end
+        elif self.if_body != []:
+            self.pos_end = self.if_body[-1].pos_end
         else:
             self.pos_end = self.condition_node.pos_end
 
     def __repr__(self):
-        return f"if {self.condition_node} then {self.statements} else {self.else_statements}"
+        return f"if {self.condition_node} then {self.if_body} else {self.else_body}"
 
 
 class FunctionDeclareNode:
-    def __init__(self, name, parameters, statements):
+    def __init__(self, name, parameters, body):
         self.name = name
         self.parameters = parameters
-        self.statements = statements
+        self.body = body
         self.pos_start = name.pos_start
-        self.pos_end = self.statements[-1].pos_end
+        self.pos_end = self.body[-1].pos_end
 
     def __repr__(self):
-        return r"{}({}){{}}".format(self.name, self.parameters, self.statements)
+        return r"{}({}){{}}".format(self.name, self.parameters, self.body)
 
 
 class FunctionCallNode:

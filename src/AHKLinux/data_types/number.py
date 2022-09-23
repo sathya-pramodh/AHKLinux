@@ -1,4 +1,5 @@
 from base_classes.value import Value
+from data_types.boolean import Boolean
 from constants import T_HEXADECIMAL
 from error_classes.runtime_error import RunTimeError
 
@@ -9,9 +10,13 @@ class Number(Value):
         self.value = value
         self.type = type_
         if self.type == T_HEXADECIMAL:
-            self.boolean = True if int(self.value, base=16) != 0 else False
+            self.boolean = True if int(self.value, base=16) else False
+            self.repr_boolean = (
+                Boolean("true") if int(self.value, base=16) else Boolean("false")
+            )
         else:
             self.boolean = True if self.value else False
+            self.repr_boolean = Boolean("true") if self.value else Boolean("false")
 
     def added_to(self, other):
         if isinstance(other, Number):

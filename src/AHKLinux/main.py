@@ -10,7 +10,8 @@ from parser.parser import Parser
 
 def print_result_list(results, debug_mode):
     if not isinstance(results, list):
-        print(results)
+        if debug_mode:
+            print(results)
         return
     for result in results:
         print_result_list(result, debug_mode)
@@ -56,7 +57,5 @@ def main(input_file, debug_mode):
             print_result_list(result.value, debug_mode)
         else:
             if debug_mode:
-                print(result.value)
-            elif not debug_mode and not isinstance(result.value, str):
                 print(result.value)
     return 0
