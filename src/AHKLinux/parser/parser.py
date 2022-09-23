@@ -9,6 +9,7 @@ Grammar:
     expression: term (PLUS|MINUS term)*
               : STRING (DOT STRING)*
               : term QUESTION_MARK expression COLON expression
+              : function-expr(call only)
     term: factor (MULTIPLY|DIVIDE|KEYWORD:and|or factor)*
     factor: (PLUS|MINUS) factor
           : (KEYWORD:not) expression
