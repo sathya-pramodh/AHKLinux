@@ -798,21 +798,23 @@ class Parser:
         elif self.current_tok.matches(T_KEYWORD, "return"):
             res.register_advancement()
             self.advance()
-            node = res.register(self.expression())
-            if res.error:
-                return res
             if self.current_tok.type != T_EOL:
-                return res.failure(
-                    InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        "Expected end of line.",
-                        self.context,
+                node = res.register(self.expression())
+                if res.error:
+                    return res
+                if self.current_tok.type != T_EOL:
+                    return res.failure(
+                        InvalidSyntaxError(
+                            self.current_tok.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected end of line.",
+                            self.context,
+                        )
                     )
-                )
-            res.register_advancement()
-            self.advance()
-            return res.success(ReturnNode(node))
+                res.register_advancement()
+                self.advance()
+                return res.success(ReturnNode(node))
+            return res.success(ReturnNode(None))
 
         elif self.current_tok.matches(T_KEYWORD, "if"):
             pos_start = self.current_tok.pos_start

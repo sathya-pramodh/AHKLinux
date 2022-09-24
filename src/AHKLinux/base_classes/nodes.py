@@ -187,7 +187,11 @@ class FunctionDeclareNode:
         self.parameters = parameters
         self.body = body
         self.pos_start = name.pos_start
-        self.pos_end = self.body[-1].pos_end
+        self.pos_end = (
+            self.body[-1].pos_end
+            if self.body[-1] is not None
+            else self.body[-2].pos_end
+        )
 
     def __repr__(self):
         return r"{}({}){{}}".format(self.name, self.parameters, self.body)

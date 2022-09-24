@@ -155,13 +155,15 @@ class Interpreter:
                 context.parent.symbol_table.set(var_name, (value, True))
             else:
                 context.symbol_table.set(var_name, (value, False))
-
-        value.set_context(context).set_pos(node.pos_start, node.pos_end)
-        return res.success(
-            "'{}' inside '{}' has been assigned the value {}.".format(
-                var_name, context.display_name, value
-            )
+        debug_msg = "'{}' inside '{}' has been assigned the value {}.".format(
+            var_name, context.display_name, value
         )
+        value.set_context(context).set_pos(node.pos_start, node.pos_end)
+        if isinstance(var_value, list):
+            var_value.pop()
+            var_value.append(debug_msg)
+            return res.success(var_value)
+        return res.success(debug_msg)
 
     def visit_L_VarAssignNode(self, node, context):
         res = RuntimeResult()
