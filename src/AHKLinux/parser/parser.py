@@ -403,6 +403,15 @@ class Parser:
             self.advance()
         return res.success(FunctionCallNode(var_name, params))
 
+    def make_u_string(self, name):
+        res = ParseResult()
+        string = ""
+        while self.current_tok.type not in (T_COMMA, T_EOL):
+            string += self.current_tok.value
+            res.register_advancement()
+            self.advance()
+        return string
+
     def atom(self):
         res = ParseResult()
         tok = self.current_tok
@@ -982,6 +991,122 @@ class Parser:
                 res.register_advancement()
                 self.advance()
                 return res
+        elif self.current_tok.matches(T_COMMAND, "MsgBox"):
+            name = self.current_tok
+            res.register_advancement()
+            self.advance()
+            if self.current_tok.type == T_PERCENT:
+                res.register_advancement()
+                self.advance()
+                text = res.register(self.expression())
+                if res.error:
+                    return res
+                return res.success(CommandNode(name, text=text))
+            elif self.current_tok.type == T_COMMA:
+                if self.current_tok.type not in (T_DECIMAL, T_HEXADECIMAL):
+                    return res.failure(
+                        InvalidSyntaxError(
+                            name.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected a decimal or hexadecimal for an option.",
+                            self.context,
+                        )
+                    )
+                option = NumberNode(self.current_tok)
+                res.register_advancement()
+                self.advance()
+                if self.current_tok.type != T_COMMA:
+                    return res.failure(
+                        InvalidSyntaxError(
+                            name.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected ','.",
+                            self.context,
+                        )
+                    )
+                res.register_advancement()
+                self.advance()
+                if self.current_tok.type == T_COMMA:
+                    res.register_advancement()
+                    self.advance()
+                    text = self.make_u_string(name)
+                    if self.current_tok.type != T_EOL:
+                        return res.failure(
+                            InvalidSyntaxError(
+                                name.pos_start,
+                                self.current_tok.pos_end,
+                                "Expected end of line.",
+                                self.context,
+                            )
+                        )
+                    return res.success(CommandNode(name, text=text))
+                else:
+                    title = self.make_u_string(name)
+                    if self.current_tok.type != T_COMMA:
+                        return res.failure(
+                            InvalidSyntaxError(
+                                name.pos_start,
+                                self.current_tok.pos_end,
+                                "Expected ','.",
+                                self.context,
+                            )
+                        )
+                    res.register_advancement()
+                    self.advance()
+                    text = self.make_u_string(name)
+                    if self.current_tok.type != T_COMMA:
+                        return res.failure(
+                            InvalidSyntaxError(
+                                name.pos_start,
+                                self.current_tok.pos_end,
+                                "Expected ','.",
+                                self.context,
+                            )
+                        )
+                    res.register_advancement()
+                    self.advance()
+                    if self.current_tok.type == T_PERCENT:
+                        res.register_advancement()
+                        self.advance()
+                        timeout = res.register(self.expression())
+                        if res.error:
+                            return res
+                        if self.current_tok.type != T_EOL:
+                            return res.failure(
+                                InvalidSyntaxError(
+                                    name.pos_start,
+                                    self.current_tok.pos_end,
+                                    "Expected end of line.",
+                                    self.context,
+                                )
+                            )
+                        return res.success(
+                            CommandNode(name, option, title, text, timeout)
+                        )
+                    if self.current_tok.type not in (T_DECIMAL, T_HEXADECIMAL):
+                        return res.failure(
+                            InvalidSyntaxError(
+                                name.pos_start,
+                                self.current_tok.pos_end,
+                                "Expected a number or a hexadecimal for a timeout.",
+                                self.context,
+                            )
+                        )
+                    timeout = NumberNode(self.current_tok)
+                    res.register_advancement()
+                    self.advance()
+                    if self.current_tok.type != T_EOL:
+                        return res.failure(
+                            InvalidSyntaxError(
+                                name.pos_start,
+                                self.current_tok.pos_end,
+                                "Expected end of line.",
+                                self.context,
+                            )
+                        )
+                    return res.success(CommandNode(name, option, title, text, timeout))
+            text = self.make_u_string(name)
+            return res.success(CommandNode(name, text=text))
 
         elif self.current_tok.type in (T_EOL, T_EOF, T_SOF):
             res.register_advancement()

@@ -746,3 +746,7 @@ class Interpreter:
         if res.error:
             return res
         return res.success(value)
+
+    def visit_CommandNode(self, node, context):
+        res = RuntimeResult()
+        return res.success("Gotta implement this m8.")

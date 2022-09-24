@@ -149,12 +149,7 @@ class Lexer:
                 tokens.append(tok)
 
             else:
-                pos_start = self.pos.copy()
-                char = self.current_char
-                self.advance()
-                return [], IllegalCharError(
-                    pos_start, self.pos, "'{}'".format(char), self.context
-                )
+                tokens.append(Token(T_UNKNOWN, pos_start=self.pos))
             self.advance()
         tokens.append(Token(T_EOF, pos_start=self.pos))
         return tokens, None
@@ -236,6 +231,8 @@ class Lexer:
         tok_type = ""
         if identifier_str in KEYWORDS:
             tok_type = T_KEYWORD
+        elif identifier_str in COMMANDS:
+            tok_type = T_COMMAND
         elif identifier_str in BOOLEANS:
             tok_type = T_BOOLEAN
         else:

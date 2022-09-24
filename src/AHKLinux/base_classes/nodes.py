@@ -218,3 +218,15 @@ class ReturnNode:
 
     def __repr__(self):
         return f"return {self.node}"
+
+
+class CommandNode:
+    def __init__(self, name, option=None, title=None, text=None, timeout=None):
+        self.name = name
+        self.option = option
+        self.title = title
+        self.text = text
+        self.timeout = timeout
+
+    def __repr__(self):
+        return f"{self.name}, {self.option}, {self.title}, {self.text}, {self.timeout}"
