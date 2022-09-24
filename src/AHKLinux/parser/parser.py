@@ -6,6 +6,7 @@ Grammar:
              : (KEYWORD:global)? IDENTIFIER ASSIGNMENT expression
              : IDENTIFIER (DOT IDENTIFIER)* (LSQUARE (expression)? RSQUARE)* (ASSIGNMENT expression)*
              : IDENTIFIER L_ASSIGNMENT U_STRING
+             : command-expr
     expression: term (PLUS|MINUS term)*
               : STRING (DOT STRING)*
               : term QUESTION_MARK expression COLON expression
@@ -26,6 +27,7 @@ Grammar:
     function-expr : IDENTIFIER LPAREN (expression (COMMA expression)*)? RPAREN (LCURVE (expression (\n expression)*)* RCURVE)?
     return-expr : KEYWORD:return expression
     block-comment : BCOMMENT_START .* BCOMMENT_END
+    command-expr : COMMAND (COMMA expression|U_STRING)*
 """
 from constants import *
 from base_classes.nodes import *
