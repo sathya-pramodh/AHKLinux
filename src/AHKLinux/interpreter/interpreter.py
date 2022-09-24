@@ -1,7 +1,13 @@
 import re
 
 from base_classes.context import Context
-from base_classes.nodes import ReturnNode, StringNode, VarAccessNode
+from base_classes.nodes import (
+    ReturnNode,
+    StringNode,
+    VarAccessNode,
+    UnaryOpNode,
+    BinOpNode,
+)
 from base_classes.symbol_table import SymbolTable
 from constants import *
 from data_types.array import Array
@@ -135,20 +141,26 @@ class Interpreter:
         var_value = res.register(self.visit(node.value_node, context))
         if res.error:
             return res
+        if isinstance(var_value, list):
+            value = var_value[-1]
+        else:
+            value = var_value
         if node.scope == "global" and context.parent is not None:
-            context.parent.symbol_table.set(var_name, (var_value, True))
+            context.parent.symbol_table.set(var_name, (value, True))
         else:
             if (
                 context.parent is not None
                 and context.parent.symbol_table.global_from_child(var_name)
             ):
-                context.parent.symbol_table.set(var_name, (var_value, True))
+                context.parent.symbol_table.set(var_name, (value, True))
             else:
-                context.symbol_table.set(var_name, (var_value, False))
+                context.symbol_table.set(var_name, (value, False))
 
-        var_value.set_context(context).set_pos(node.pos_start, node.pos_end)
+        value.set_context(context).set_pos(node.pos_start, node.pos_end)
         return res.success(
-            "'{}' has been assigned the value {}.".format(var_name, var_value)
+            "'{}' inside '{}' has been assigned the value {}.".format(
+                var_name, context.display_name, value
+            )
         )
 
     def visit_L_VarAssignNode(self, node, context):
@@ -166,7 +178,9 @@ class Interpreter:
             return res
         context.symbol_table.set(var_name, (value, False))
         return res.success(
-            "'{}' has been assigned the value {}.".format(var_name, value)
+            "'{}' inside '{}' has been assigned the value {}.".format(
+                var_name, context.display_name, value
+            )
         )
 
     def visit_BinOpNode(self, node, context):
@@ -176,43 +190,80 @@ class Interpreter:
             return res
 
         if node.op_tok.type == T_PLUS:
-            right = res.register(self.visit(node.right_node, context))
-            if res.error:
-                return res
-            result, error = left.added_to(right)
-            if error:
-                return res.failure(error)
-            result.set_context(context).set_pos(node.pos_start, node.pos_end)
-            return res.success(result)
+            if isinstance(left, Number):
+                right = res.register(self.visit(node.right_node, context))
+                if res.error:
+                    return res
+                result, error = left.added_to(right)
+                if error or result is None:
+                    return res.failure(error)
+                result.set_context(context).set_pos(node.pos_start, node.pos_end)
+                return res.success(result)
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "{} is not a Number.".format(left),
+                    context,
+                )
+            )
         elif node.op_tok.type == T_MINUS:
-            right = res.register(self.visit(node.right_node, context))
-            if res.error:
-                return res
-            result, error = left.subtracted_by(right)
-            if error:
-                return res.failure(error)
-            result.set_context(context).set_pos(node.pos_start, node.pos_end)
-            return res.success(result)
+            if isinstance(left, Number):
+                right = res.register(self.visit(node.right_node, context))
+                if res.error:
+                    return res
+                result, error = left.subtracted_by(right)
+                if error or result is None:
+                    return res.failure(error)
+                result.set_context(context).set_pos(node.pos_start, node.pos_end)
+                return res.success(result)
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "{} is not a Number.".format(left),
+                    context,
+                )
+            )
 
         elif node.op_tok.type == T_MULTIPLY:
-            right = res.register(self.visit(node.right_node, context))
-            if res.error:
-                return res
-            result, error = left.multiplied_by(right)
-            if error:
-                return res.failure(error)
-            result.set_context(context).set_pos(node.pos_start, node.pos_end)
-            return res.success(result)
-        elif node.op_tok.type == T_DIVIDE:
-            right = res.register(self.visit(node.right_node, context))
-            if res.error:
-                return res
-            result, error = left.divided_by(right)
+            if isinstance(left, Number):
+                right = res.register(self.visit(node.right_node, context))
+                if res.error:
+                    return res
+                result, error = left.multiplied_by(right)
+                if error or result is None:
+                    return res.failure(error)
+                result.set_context(context).set_pos(node.pos_start, node.pos_end)
+                return res.success(result)
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "{} is not a Number.".format(left),
+                    context,
+                )
+            )
 
-            if error:
-                return res.failure(error)
-            result.set_context(context).set_pos(node.pos_start, node.pos_end)
-            return res.success(result)
+        elif node.op_tok.type == T_DIVIDE:
+            if isinstance(left, Number):
+                right = res.register(self.visit(node.right_node, context))
+                if res.error:
+                    return res
+                result, error = left.divided_by(right)
+
+                if error or result is None:
+                    return res.failure(error)
+                result.set_context(context).set_pos(node.pos_start, node.pos_end)
+                return res.success(result)
+            return res.failure(
+                RunTimeError(
+                    node.pos_start,
+                    node.pos_end,
+                    "{} is not a Number.".format(left),
+                    context,
+                )
+            )
         elif node.op_tok.type == T_DOT:
             if isinstance(left, String):
                 right = res.register(self.visit(node.right_node, context))
@@ -248,7 +299,29 @@ class Interpreter:
             )
         elif node.op_tok.type == T_LSQUARE:
             if isinstance(left, Array):
-                if isinstance(node.right_node.var_name_tok.value, int):
+                if isinstance(node.right_node.var_name_tok, UnaryOpNode) or isinstance(
+                    node.right_node.var_name_tok, BinOpNode
+                ):
+                    key = res.register(
+                        self.visit(node.right_node.var_name_tok, context)
+                    )
+                    if res.error:
+                        return res
+                    if not isinstance(key, Number) and not isinstance(key.value, int):
+                        return res.failure(
+                            RunTimeError(
+                                node.pos_start,
+                                node.pos_end,
+                                "Array indices can only be integers.",
+                                context,
+                            )
+                        )
+                    result, error = left.get(key.value)
+                    if error or result is None:
+                        return res.failure(error)
+                    result.set_context(context).set_pos(node.pos_start, node.pos_end)
+                    return res.success(result)
+                elif isinstance(node.right_node.var_name_tok.value, int):
                     result, error = left.get(node.right_node.var_name_tok.value)
                     if error or result is None:
                         return res.failure(error)
@@ -258,7 +331,7 @@ class Interpreter:
                     RunTimeError(
                         node.pos_start,
                         node.pos_end,
-                        "Expected a Number in '[]'.",
+                        "Array indices can only be integers.",
                         context,
                     )
                 )
@@ -387,7 +460,42 @@ class Interpreter:
                 )
             )
         if isinstance(compiled_access_node, Array):
-            if isinstance(node.key.var_name_tok.value, int):
+            if node.access_method == T_DOT:
+                return res.failure(
+                    RunTimeError(
+                        node.pos_start,
+                        node.pos_end,
+                        "Cannot use '.' for this operation.",
+                        context,
+                    )
+                )
+            if isinstance(node.key.var_name_tok, UnaryOpNode) or isinstance(
+                node.key.var_name_tok, BinOpNode
+            ):
+                key = res.register(self.visit(node.key.var_name_tok, context))
+                if res.error:
+                    return res
+                if not isinstance(key, Number) and not isinstance(key.value, int):
+                    return res.failure(
+                        RunTimeError(
+                            node.pos_start,
+                            node.pos_end,
+                            "Array indices can only be integers.",
+                            context,
+                        )
+                    )
+                ret_code, error = compiled_access_node.set(key.value, compiled_value)
+                if error:
+                    return res.failure(error)
+                compiled_value.set_context(context).set_pos(
+                    node.pos_start, node.pos_end
+                )
+                return res.success(
+                    "Index {} was assigned the value {}.".format(
+                        key.value, compiled_value
+                    )
+                )
+            elif isinstance(node.key.var_name_tok.value, int):
                 ret_code, error = compiled_access_node.set(
                     node.key.var_name_tok.value, compiled_value
                 )
@@ -461,16 +569,37 @@ class Interpreter:
             return res.success(result)
 
         if isinstance(compiled_access_node, Array):
-            if isinstance(node.key.var_name_tok.value, int):
-                if node.access_method == T_DOT:
+            if node.access_method == T_DOT:
+                return res.failure(
+                    RunTimeError(
+                        node.pos_start,
+                        node.pos_end,
+                        "Cannot use '.' for this operation.",
+                        context,
+                    )
+                )
+            if isinstance(node.key.var_name_tok, UnaryOpNode) or isinstance(
+                node.key.var_name_tok, BinOpNode
+            ):
+                key = res.register(self.visit(node.key.var_name_tok, context))
+                if res.error:
+                    return res
+                if not isinstance(key, Number) and not isinstance(key.value, int):
                     return res.failure(
                         RunTimeError(
                             node.pos_start,
                             node.pos_end,
-                            "Cannot use '.' for this operation.",
+                            "Array indices can only be integers.",
                             context,
                         )
                     )
+                value, error = compiled_access_node.get(key.value)
+                if error or value is None:
+                    return res.failure(error)
+                value.set_pos(node.pos_start, node.pos_end)
+                return res.success(value)
+
+            elif isinstance(node.key.var_name_tok.value, int):
                 value, error = compiled_access_node.get(node.key.var_name_tok.value)
                 if error or value is None:
                     return res.failure(error)
@@ -582,13 +711,18 @@ class Interpreter:
             )
             idx += 1
 
+        results = []
         for statement in func.body:
             result = res.register(self.visit(statement, function_context))
             if res.error:
                 return res
             if isinstance(statement, ReturnNode):
-                return res.success(result)
-        return res.success(String(""))
+                results.append(result)
+                break
+            results.append(result)
+        else:
+            results.append(String(""))
+        return res.success(results)
 
     def visit_ReturnNode(self, node, context):
         res = RuntimeResult()

@@ -47,6 +47,12 @@ class Number(Value):
                 Number(self.value + other.value, self.type).set_context(self.context),
                 None,
             )
+        return None, RunTimeError(
+            self.pos_start,
+            self.pos_end,
+            "{} is not a Number.".format(other),
+            self.context,
+        )
 
     def subtracted_by(self, other):
         if isinstance(other, Number):
@@ -76,6 +82,12 @@ class Number(Value):
                 Number(self.value - other.value, self.type).set_context(self.context),
                 None,
             )
+        return None, RunTimeError(
+            self.pos_start,
+            self.pos_end,
+            "{} is not a Number.".format(other),
+            self.context,
+        )
 
     def multiplied_by(self, other):
         if isinstance(other, Number):
@@ -105,6 +117,12 @@ class Number(Value):
                 Number(self.value * other.value, self.type).set_context(self.context),
                 None,
             )
+        return None, RunTimeError(
+            self.pos_start,
+            self.pos_end,
+            "{} is not a Number.".format(other),
+            self.context,
+        )
 
     def divided_by(self, other):
         if isinstance(other, Number):
@@ -148,6 +166,12 @@ class Number(Value):
                 Number(self.value / other.value, self.type).set_context(self.context),
                 None,
             )
+        return None, RunTimeError(
+            self.pos_start,
+            self.pos_end,
+            "{} is not a Number.".format(other),
+            self.context,
+        )
 
     def copy(self):
         copy = Number(self.value, self.type)

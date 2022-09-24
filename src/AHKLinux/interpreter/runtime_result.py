@@ -15,3 +15,8 @@ class RuntimeResult:
     def failure(self, error):
         self.error = error
         return self
+
+    def __repr__(self):
+        if not self.error:
+            return f"{self.value}"
+        return f"{self.error}"

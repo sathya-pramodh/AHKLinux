@@ -71,6 +71,7 @@ class Parser:
         res,
         var_name,
         disable_assignment=False,
+        disable_access=False,
         disable_dot=False,
     ):
         ops = [T_LSQUARE] if disable_dot else [T_DOT, T_LSQUARE]
@@ -129,7 +130,7 @@ class Parser:
                     accumulator = BinOpNode(accumulator, Token(T_LSQUARE), inner_key)
                 else:
                     accumulator = BinOpNode(
-                        accumulator, Token(T_LSQUARE), VarAccessNode(inner_key.tok)
+                        accumulator, Token(T_LSQUARE), VarAccessNode(inner_key)
                     )
         if self.current_tok.type == T_ASSIGNMENT:
             if disable_assignment:
@@ -151,9 +152,18 @@ class Parser:
                     accumulator.left_node, accumulator.right_node, access_method, value
                 )
             )
-        return res.success(
-            ObjectAccessNode(
-                accumulator.left_node, accumulator.right_node, access_method
+        if not disable_access:
+            return res.success(
+                ObjectAccessNode(
+                    accumulator.left_node, accumulator.right_node, access_method
+                )
+            )
+        return res.failure(
+            InvalidSyntaxError(
+                var_name.pos_start,
+                self.current_tok.pos_end,
+                "Expected a statement.",
+                self.context,
             )
         )
 
@@ -193,7 +203,7 @@ class Parser:
     def get_condition(self):
         res = ParseResult()
         left = res.register(self.expression())
-        if res.error:
+        if res.error or left is None:
             return res
         cond = self.current_tok.matches(T_KEYWORD, "and") or self.current_tok.matches(
             T_KEYWORD, "or"
@@ -307,6 +317,11 @@ class Parser:
             res.register_advancement()
             self.advance()
             return res.success(IfElseNode(condition_node, if_body, else_body))
+        res.register_recession()
+        self.recede()
+        if self.current_tok.type != T_EOL:
+            res.register_advancement()
+            self.advance()
         return res.success(IfNode(condition_node, if_body))
 
     def function_expr(self, var_name, allow_declaration=True):
@@ -383,6 +398,9 @@ class Parser:
             return res.success(FunctionDeclareNode(var_name, params, body))
         res.register_recession()
         self.recede()
+        if self.current_tok.type != T_EOL:
+            res.register_advancement()
+            self.advance()
         return res.success(FunctionCallNode(var_name, params))
 
     def atom(self):
@@ -405,8 +423,14 @@ class Parser:
             return res.success(BooleanNode(tok))
 
         elif tok.type == T_IDENTIFIER:
+            var_name = self.current_tok
             res.register_advancement()
             self.advance()
+            if self.current_tok.type == T_LPAREN:
+                res.register_advancement()
+                self.advance()
+                res = self.function_expr(var_name, allow_declaration=False)
+                return res
             return res.success(VarAccessNode(tok))
 
         elif tok.type == T_LPAREN:
@@ -628,7 +652,7 @@ class Parser:
             InvalidSyntaxError(
                 tok.pos_start,
                 tok.pos_end,
-                "Expected int, float, hexadecimal, string, or an object.",
+                "Expected an expression.",
                 self.context,
             )
         )
@@ -652,7 +676,7 @@ class Parser:
         return self.atom()
 
     def term(self):
-        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_DOT))
+        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_DOT, T_KEYWORD))
 
     def expression(self):
         res = ParseResult()
@@ -661,15 +685,45 @@ class Parser:
             var_name = self.current_tok
             res.register_advancement()
             self.advance()
-            if self.current_tok.type == T_LPAREN:
+
+            if self.current_tok.type == T_LSQUARE:
+                op_tok = self.current_tok
                 res.register_advancement()
                 self.advance()
-                res = self.function_expr(var_name, allow_declaration=False)
+                inner_key = res.register(self.expression())
+                if res.error or inner_key is None:
+                    return res
+                if isinstance(inner_key, VarAccessNode):
+                    accumulator = BinOpNode(VarAccessNode(var_name), op_tok, inner_key)
+                else:
+                    accumulator = BinOpNode(
+                        VarAccessNode(var_name), op_tok, VarAccessNode(inner_key)
+                    )
+                if self.current_tok.type != T_RSQUARE:
+                    return res.failure(
+                        InvalidSyntaxError(
+                            var_name.pos_start,
+                            self.current_tok.pos_end,
+                            "Expected ']'.",
+                            self.context,
+                        )
+                    )
+                res.register_advancement()
+                self.advance()
+                access_method = T_LSQUARE
+                res = self.get_keys(
+                    accumulator,
+                    access_method,
+                    res,
+                    var_name,
+                    disable_assignment=True,
+                )
                 return res
+
             res.register_recession()
             self.recede()
 
-        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_DOT)))
+        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_DOT, T_KEYWORD)))
         if res.error or node is None:
             return res
         if self.current_tok.type == T_QUESTION_MARK:
@@ -867,7 +921,9 @@ class Parser:
                 res.register_advancement()
                 self.advance()
                 access_method = T_DOT
-                res = self.get_keys(accumulator, access_method, res, var_name)
+                res = self.get_keys(
+                    accumulator, access_method, res, var_name, disable_access=True
+                )
                 if self.current_tok.type != T_EOL:
                     return res.failure(
                         InvalidSyntaxError(
@@ -882,20 +938,20 @@ class Parser:
                 return res
 
             elif self.current_tok.type == T_LSQUARE:
+                op_tok = self.current_tok
                 res.register_advancement()
                 self.advance()
                 inner_key = res.register(self.expression())
                 if res.error or inner_key is None:
                     return res
                 if isinstance(inner_key, VarAccessNode):
-                    accumulator = BinOpNode(
-                        VarAccessNode(var_name), Token(T_LSQUARE), inner_key
-                    )
+                    accumulator = BinOpNode(VarAccessNode(var_name), op_tok, inner_key)
+
                 else:
                     accumulator = BinOpNode(
                         VarAccessNode(var_name),
-                        Token(T_LSQUARE),
-                        VarAccessNode(inner_key.tok),
+                        op_tok,
+                        VarAccessNode(inner_key),
                     )
                 if self.current_tok.type != T_RSQUARE:
                     return res.failure(
@@ -909,7 +965,9 @@ class Parser:
                 res.register_advancement()
                 self.advance()
                 access_method = T_LSQUARE
-                res = self.get_keys(accumulator, access_method, res, var_name)
+                res = self.get_keys(
+                    accumulator, access_method, res, var_name, disable_access=True
+                )
                 if self.current_tok.type != T_EOL:
                     return res.failure(
                         InvalidSyntaxError(
