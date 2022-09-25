@@ -749,4 +749,4 @@ class Interpreter:
 
     def visit_CommandNode(self, node, context):
         res = RuntimeResult()
-        return res.success("Gotta implement this m8.")
+        return res.success("")
