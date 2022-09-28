@@ -18,6 +18,7 @@ from data_types.number import Number
 from data_types.string import String
 from error_classes.runtime_error import RunTimeError
 from interpreter.runtime_result import RuntimeResult
+from window import msgbox
 
 
 class Interpreter:
@@ -749,4 +750,54 @@ class Interpreter:
 
     def visit_CommandNode(self, node, context):
         res = RuntimeResult()
-        return res.success("")
+        if node.name.matches(T_COMMAND, "MsgBox"):
+            text = ""
+            title = f"{node.name.pos_start.filename}"
+            option = Number(0, T_DECIMAL)
+            timeout = Number(2147483, T_DECIMAL)
+            for key, value in node.args.items():
+                if key == "text" and value is not None:
+                    text = value
+                elif key == "title" and value is not None:
+                    title = value
+                elif key == "option" and value is not None:
+                    option = res.register(self.visit(value, context))
+                    if res.error:
+                        return res
+                    if not isinstance(option, Number) or option.type not in (
+                        T_HEXADECIMAL,
+                        T_DECIMAL,
+                    ):
+                        return res.failure(
+                            RunTimeError(
+                                node.pos_start,
+                                node.pos_end,
+                                "Expected a decimal or a hexadecimal for an option.",
+                                context,
+                            )
+                        )
+                elif key == "timeout" and value is not None:
+                    timeout = res.register(self.visit(value, context))
+                    if res.error:
+                        return res
+                    if not isinstance(option, Number) or option.type not in (
+                        T_HEXADECIMAL,
+                        T_DECIMAL,
+                    ):
+                        return res.failure(
+                            RunTimeError(
+                                node.pos_start,
+                                node.pos_end,
+                                "Expected a decimal or a hexadecimal for an option.",
+                                context,
+                            )
+                        )
+                    if timeout.value > 2147483:
+                        timeout = Number(2147483, T_DECIMAL)
+
+            msgbox.make_msgbox(title, text, option.value, timeout)
+            return res.success(
+                "MsgBox with title: {} and text: {} is being displayed.".format(
+                    title, text
+                )
+            )

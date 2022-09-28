@@ -221,12 +221,9 @@ class ReturnNode:
 
 
 class CommandNode:
-    def __init__(self, name, option=None, title=None, text=None, timeout=None):
+    def __init__(self, name, **kwargs):
         self.name = name
-        self.option = option
-        self.title = title
-        self.text = text
-        self.timeout = timeout
+        self.args = kwargs
 
     def __repr__(self):
-        return f"{self.name}, {self.option}, {self.title}, {self.text}, {self.timeout}"
+        return f"{self.name} {self.args}"
