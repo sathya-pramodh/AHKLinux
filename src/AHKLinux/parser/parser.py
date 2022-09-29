@@ -410,14 +410,9 @@ class Parser:
         string = ""
         condition = (T_COMMA, T_EOL) if check_commas else (T_EOL,)
         while self.current_tok.type not in condition:
-            if self.current_tok.type == T_COMMA:
-                string += ", "
-                res.register_advancement()
-                self.advance()
-            else:
-                string += str(self.current_tok.value) + " "
-                res.register_advancement()
-                self.advance()
+            string += str(self.current_tok.value) + " "
+            res.register_advancement()
+            self.advance()
         return string.strip()
 
     def atom(self):
@@ -1091,23 +1086,45 @@ class Parser:
                     res.register_advancement()
                     self.advance()
                     text = self.make_u_string(name)
-                    if self.current_tok.type != T_COMMA:
-                        return res.failure(
-                            InvalidSyntaxError(
-                                name.pos_start,
-                                self.current_tok.pos_end,
-                                "Expected ','.",
-                                self.context,
-                            )
-                        )
-                    res.register_advancement()
-                    self.advance()
-                    if self.current_tok.type == T_PERCENT:
+                    if self.current_tok.type == T_COMMA:
                         res.register_advancement()
                         self.advance()
-                        timeout = res.register(self.expression())
-                        if res.error:
-                            return res
+                        if self.current_tok.type == T_PERCENT:
+                            res.register_advancement()
+                            self.advance()
+                            timeout = res.register(self.expression())
+                            if res.error:
+                                return res
+                            if self.current_tok.type != T_EOL:
+                                return res.failure(
+                                    InvalidSyntaxError(
+                                        name.pos_start,
+                                        self.current_tok.pos_end,
+                                        "Expected end of line.",
+                                        self.context,
+                                    )
+                                )
+                            return res.success(
+                                CommandNode(
+                                    name,
+                                    option=option,
+                                    title=title,
+                                    text=text,
+                                    timeout=timeout,
+                                )
+                            )
+                        if self.current_tok.type not in (T_DECIMAL, T_HEXADECIMAL):
+                            return res.failure(
+                                InvalidSyntaxError(
+                                    name.pos_start,
+                                    self.current_tok.pos_end,
+                                    "Expected a number or a hexadecimal for a timeout.",
+                                    self.context,
+                                )
+                            )
+                        timeout = NumberNode(self.current_tok)
+                        res.register_advancement()
+                        self.advance()
                         if self.current_tok.type != T_EOL:
                             return res.failure(
                                 InvalidSyntaxError(
@@ -1126,18 +1143,6 @@ class Parser:
                                 timeout=timeout,
                             )
                         )
-                    if self.current_tok.type not in (T_DECIMAL, T_HEXADECIMAL):
-                        return res.failure(
-                            InvalidSyntaxError(
-                                name.pos_start,
-                                self.current_tok.pos_end,
-                                "Expected a number or a hexadecimal for a timeout.",
-                                self.context,
-                            )
-                        )
-                    timeout = NumberNode(self.current_tok)
-                    res.register_advancement()
-                    self.advance()
                     if self.current_tok.type != T_EOL:
                         return res.failure(
                             InvalidSyntaxError(
@@ -1147,10 +1152,10 @@ class Parser:
                                 self.context,
                             )
                         )
+                    res.register_advancement()
+                    self.advance()
                     return res.success(
-                        CommandNode(
-                            name, option=option, title=title, text=text, timeout=timeout
-                        )
+                        CommandNode(name, option=option, title=title, text=text)
                     )
             text = self.make_u_string(name, check_commas=False)
             return res.success(CommandNode(name, text=text))

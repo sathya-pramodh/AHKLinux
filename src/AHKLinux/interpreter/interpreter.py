@@ -795,7 +795,7 @@ class Interpreter:
                     if timeout.value > 2147483:
                         timeout = Number(2147483, T_DECIMAL)
 
-            msgbox.make_msgbox(title, text, option.value, timeout)
+            msgbox.make_msgbox(title, text, option.value, timeout.value)
             return res.success(
                 "MsgBox with title: {} and text: {} is being displayed.".format(
                     title, text

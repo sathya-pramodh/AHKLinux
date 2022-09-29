@@ -43,29 +43,29 @@ class Lexer:
                 continue
 
             elif self.current_char == "=":
-                tokens.append(Token(T_L_ASSIGNMENT, pos_start=self.pos))
+                tokens.append(Token(T_L_ASSIGNMENT, "=", pos_start=self.pos))
                 self.advance()
                 string_tok = self.make_u_string()
                 tokens.append(string_tok)
                 continue
 
             elif self.current_char == "?":
-                tokens.append(Token(T_QUESTION_MARK, pos_start=self.pos))
+                tokens.append(Token(T_QUESTION_MARK, "?", pos_start=self.pos))
 
             elif self.current_char == "%":
-                tokens.append(Token(T_PERCENT, pos_start=self.pos))
+                tokens.append(Token(T_PERCENT, "%", pos_start=self.pos))
 
             elif self.current_char == "\n":
                 tokens.append(Token(T_EOL, pos_start=self.pos))
 
             elif self.current_char == ".":
-                tokens.append(Token(T_DOT, pos_start=self.pos))
+                tokens.append(Token(T_DOT, ".", pos_start=self.pos))
 
             elif self.current_char == "+":
-                tokens.append(Token(T_PLUS, pos_start=self.pos))
+                tokens.append(Token(T_PLUS, "+", pos_start=self.pos))
 
             elif self.current_char == "-":
-                tokens.append(Token(T_MINUS, pos_start=self.pos))
+                tokens.append(Token(T_MINUS, "-", pos_start=self.pos))
 
             elif self.current_char == "*":
                 pos_start = self.pos.copy()
@@ -73,11 +73,13 @@ class Lexer:
                 if self.current_char == "/":
                     self.advance()
                     tokens.append(
-                        Token(T_BCOMMENT_END, pos_start=pos_start, pos_end=self.pos)
+                        Token(
+                            T_BCOMMENT_END, "*/", pos_start=pos_start, pos_end=self.pos
+                        )
                     )
                     continue
                 else:
-                    tokens.append(Token(T_MULTIPLY, pos_start=self.pos))
+                    tokens.append(Token(T_MULTIPLY, "*", pos_start=self.pos))
                     continue
 
             elif self.current_char == "/":
@@ -86,11 +88,16 @@ class Lexer:
                 if self.current_char == "*":
                     self.advance()
                     tokens.append(
-                        Token(T_BCOMMENT_START, pos_start=pos_start, pos_end=self.pos)
+                        Token(
+                            T_BCOMMENT_START,
+                            "/*",
+                            pos_start=pos_start,
+                            pos_end=self.pos,
+                        )
                     )
                     continue
                 else:
-                    tokens.append(Token(T_DIVIDE, pos_start=pos_start))
+                    tokens.append(Token(T_DIVIDE, "/", pos_start=pos_start))
                     continue
 
             elif self.current_char in LETTERS + "@#_$":
@@ -101,9 +108,9 @@ class Lexer:
                 next_char = self.get_next_char(self.pos.idx)
                 if next_char is not None and next_char == "=":
                     self.advance()
-                    tokens.append(Token(T_ASSIGNMENT, pos_start=self.pos))
+                    tokens.append(Token(T_ASSIGNMENT, ":=", pos_start=self.pos))
                 elif next_char is not None:
-                    tokens.append(Token(T_COLON, pos_start=self.pos))
+                    tokens.append(Token(T_COLON, ":", pos_start=self.pos))
                 else:
                     char = self.current_char
                     return [], IllegalCharError(
@@ -111,25 +118,25 @@ class Lexer:
                     )
 
             elif self.current_char == "(":
-                tokens.append(Token(T_LPAREN, pos_start=self.pos))
+                tokens.append(Token(T_LPAREN, "(", pos_start=self.pos))
 
             elif self.current_char == ")":
-                tokens.append(Token(T_RPAREN, pos_start=self.pos))
+                tokens.append(Token(T_RPAREN, ")", pos_start=self.pos))
 
             elif self.current_char == "[":
-                tokens.append(Token(T_LSQUARE, pos_start=self.pos))
+                tokens.append(Token(T_LSQUARE, "]", pos_start=self.pos))
 
             elif self.current_char == "]":
-                tokens.append(Token(T_RSQUARE, pos_start=self.pos))
+                tokens.append(Token(T_RSQUARE, "]", pos_start=self.pos))
 
             elif self.current_char == "{":
-                tokens.append(Token(T_LCURVE, pos_start=self.pos))
+                tokens.append(Token(T_LCURVE, "{", pos_start=self.pos))
 
             elif self.current_char == "}":
-                tokens.append(Token(T_RCURVE, pos_start=self.pos))
+                tokens.append(Token(T_RCURVE, "}", pos_start=self.pos))
 
             elif self.current_char == ",":
-                tokens.append(Token(T_COMMA, pos_start=self.pos))
+                tokens.append(Token(T_COMMA, ",", pos_start=self.pos))
 
             elif self.current_char in DIGITS:
                 result, error = self.make_number()
@@ -149,7 +156,7 @@ class Lexer:
                 tokens.append(tok)
 
             else:
-                tokens.append(Token(T_UNKNOWN, pos_start=self.pos))
+                tokens.append(Token(T_UNKNOWN, self.current_char, pos_start=self.pos))
             self.advance()
         tokens.append(Token(T_EOF, pos_start=self.pos))
         return tokens, None
