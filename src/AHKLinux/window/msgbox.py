@@ -49,10 +49,10 @@ def make_contents(
         if text3 and column3:
             btn3 = Button(btn_canvas, text=text3, command=root.destroy, width=width)
             btn3.grid(row=row, column=column3, columnspan=2)
-            return [btn1, btn2, btn3], lbl
-        return [btn1, btn2], lbl
+            return [btn1, btn2, btn3]
+        return [btn1, btn2]
 
-    return [btn1], lbl
+    return [btn1]
 
 
 def get_sequence(groups):
@@ -77,7 +77,7 @@ def get_sequence(groups):
     return seq
 
 
-def make_icon(root, img_path):
+def make_icon(img_path):
     # Need to set image to global because python's GC deletes the local variable.
     global img
     img = ImageTk.PhotoImage(Image.open(img_path))
@@ -102,35 +102,33 @@ def make_msgbox(title, text, option, timeout):
     btn_name = seq["btn"]
     buttons = []
     if btn_name == "OK/Cancel":
-        buttons, lbl = make_contents(root, text, 15, 1, "OK", 1, "Cancel", 3)
+        buttons = make_contents(root, text, 15, 1, "OK", 1, "Cancel", 3)
     elif btn_name == "Abort/Retry/Ignore":
-        buttons, lbl = make_contents(
-            root, text, 10, 2, "Abort", 0, "Retry", 2, "Ignore", 4
-        )
+        buttons = make_contents(root, text, 10, 2, "Abort", 0, "Retry", 2, "Ignore", 4)
     elif btn_name == "Yes/No/Cancel":
-        buttons, lbl = make_contents(root, text, 10, 2, "Yes", 0, "No", 2, "Cancel", 4)
+        buttons = make_contents(root, text, 10, 2, "Yes", 0, "No", 2, "Cancel", 4)
     elif btn_name == "Yes/No":
-        buttons, lbl = make_contents(root, text, 15, 1, "Yes", 1, "No", 3)
+        buttons = make_contents(root, text, 15, 1, "Yes", 1, "No", 3)
     elif btn_name == "Retry/Cancel":
-        buttons, lbl = make_contents(root, text, 15, 1, "Retry", 1, "Cancel", 3)
+        buttons = make_contents(root, text, 15, 1, "Retry", 1, "Cancel", 3)
     elif btn_name == "Cancel/Try Again/Continue":
-        buttons, lbl = make_contents(
+        buttons = make_contents(
             root, text, 10, 2, "Cancel", 0, "Try Again", 2, "Continue", 4
         )
 
     else:
-        buttons, lbl = make_contents(root, text, 50, 1, "OK", 1)
+        buttons = make_contents(root, text, 50, 1, "OK", 1)
 
     # Parse icon option
     icon = seq["icon"]
     if icon == "Icon Hand (stop/error)":
-        make_icon(root, "media/icon_hand.png")
+        make_icon("media/icon_hand.png")
     elif icon == "Icon Question":
-        make_icon(root, "media/icon_question.png")
+        make_icon("media/icon_question.png")
     elif icon == "Icon Exclamation":
-        make_icon(root, "media/icon_exclamation.png")
+        make_icon("media/icon_exclamation.png")
     elif icon == "Icon Asterisk (info)":
-        make_icon(root, "media/icon_asterisk.png")
+        make_icon("media/icon_asterisk.png")
 
     # Parse modality
     modality = seq["modality"]
