@@ -76,10 +76,10 @@ This line below would throw an error on Windows
 But doesn't while using this interpreter.
 */
 f(){
-g(){
-return
-}
-return g()
+  g(){
+    return
+  }
+  return g()
 }
 f()
 ```
