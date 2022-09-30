@@ -797,7 +797,7 @@ class Interpreter:
 
             msgbox.make_msgbox(title, text, option.value, timeout.value)
             return res.success(
-                "MsgBox with title: {} and text: {} is being displayed.".format(
+                "MsgBox with title: '{}' and text: '{}' is being displayed.".format(
                     title, text
                 )
             )
