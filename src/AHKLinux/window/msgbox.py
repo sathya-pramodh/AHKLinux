@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import Button, Label, Canvas, Toplevel
+from tkinter import Button, Label, Canvas
 from window.msgbox_combinations import ALL_COMBINATIONS
 from PIL import ImageTk, Image
 
