@@ -24,7 +24,7 @@ setup(
         "License :: OSI Approved :: MIT License",
     ],
     python_requires=">=3.7",
-    install_requires=[],
+    install_requires=["pillow"],
     entry_points={
         "console_scripts": [
             "ahk = AHKLinux.init:start",
