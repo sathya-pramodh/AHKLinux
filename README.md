@@ -68,6 +68,21 @@ But doesn't while using this interpreter.
 */
 b = %a.a% ; b would be assigned to the string value '%a.a%'
 ```
+- Functions can be declared inside of other functions.
+- Example:
+```
+/*
+This line below would throw an error on Windows
+But doesn't while using this interpreter.
+*/
+f(){
+g(){
+return
+}
+return g()
+}
+f()
+```
 
 # Developer Instructions
 ## Startup Command
