@@ -757,9 +757,16 @@ class Interpreter:
             timeout = Number(2147483, T_DECIMAL)
             for key, value in node.args.items():
                 if key == "text" and value is not None:
-                    text = value
+                    text = res.register(self.visit(value, context))
+                    if res.error:
+                        return res
                 elif key == "title" and value is not None:
-                    title = value
+                    if not isinstance(title, str):
+                        title = res.register(self.visit(value, context))
+                        if res.error:
+                            return res
+                    else:
+                        title = value
                 elif key == "option" and value is not None:
                     option = res.register(self.visit(value, context))
                     if res.error:

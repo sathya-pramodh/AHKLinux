@@ -17,16 +17,15 @@ class Error:
         context = self.context
 
         def get_call_stack(context, pos, result):
-            if context:
-                result = get_call_stack(
-                    context.parent, context.parent_entry_pos, result
-                )
-                result += " File: '{}', line {}, in {}\n".format(
-                    pos.filename, pos.line, context.display_name
-                )
-                result += "   {}\n".format(
-                    pos.ftext.strip().split("\n")[pos.line - 1].strip()
-                )
+            if not context:
+                return result
+            result = get_call_stack(context.parent, context.parent_entry_pos, result)
+            result += " File: '{}', line {}, in {}\n".format(
+                pos.filename, pos.line, context.display_name
+            )
+            result += "   {}\n".format(
+                pos.ftext.strip().split("\n")[pos.line - 1].strip()
+            )
             return result
 
         result = get_call_stack(context, pos, result)

@@ -106,7 +106,7 @@ python3 init.py [options]
   ```
 - Option trigger
 ```
-python3 init.py -d
+python3 cli.py -d
 ```
 ### Input File
 - Description
@@ -114,7 +114,7 @@ python3 init.py -d
 
 - Option trigger
 ```
-python3 init.py -i <path_to_ahk_file>
+python3 cli.py -i <path_to_ahk_file>
 ```
 - This is a **required** option.
 ### Help
@@ -123,7 +123,14 @@ python3 init.py -i <path_to_ahk_file>
 
 - Option trigger
 ```
-python3 init.py -h
+python3 cli.py -h
+```
+
+# Testing
+- The pre-written tests can be used for testing.
+- Run all tests by running this command in the project's working directory (src/AHKLinux/)
+```
+python3 tests.py
 ```
 
 # Contribution
