@@ -91,7 +91,7 @@ f()
 ## Startup Command
 ```
 cd src/AHKLinux/
-python3 init.py [options]
+python3 cli.py [options]
 ```
 
 ## Options
