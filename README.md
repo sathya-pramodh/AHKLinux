@@ -43,6 +43,9 @@ An Interpreter for AutoHotKey on Linux **(planned only for X11)**.
     - if
     - if-else
   
+  - Commands
+    - MsgBox (not fully implemented yet)
+  
   - Comments
     - Single line comment (';')
     - Multi-line comment ('/* ... */')
