@@ -7,6 +7,7 @@ from base_classes.nodes import (
     VarAccessNode,
     UnaryOpNode,
     BinOpNode,
+    NumberNode,
 )
 from base_classes.symbol_table import SymbolTable
 from constants import *
@@ -269,7 +270,7 @@ class Interpreter:
             )
         elif node.op_tok.type == T_DOT:
             if isinstance(left, String):
-                right = res.register(self.visit(node.right_node, context))
+                right = res.register(self.visit(node.right_node.node, context))
                 if res.error:
                     return res
                 result, error = left.concatenated_to(right)
@@ -278,7 +279,7 @@ class Interpreter:
                 result.set_context(context).set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
             elif isinstance(left, AssociativeArray):
-                if isinstance(node.right_node, StringNode):
+                if isinstance(node.right_node.node, StringNode):
                     return res.failure(
                         RunTimeError(
                             node.pos_start,
@@ -287,7 +288,7 @@ class Interpreter:
                             context,
                         )
                     )
-                result, error = left.get(node.right_node.var_name_tok.value)
+                result, error = left.get(node.right_node.name)
                 if error or result is None:
                     return res.failure(error)
                 result.set_context(context).set_pos(node.pos_start, node.pos_end)
@@ -302,12 +303,10 @@ class Interpreter:
             )
         elif node.op_tok.type == T_LSQUARE:
             if isinstance(left, Array):
-                if isinstance(node.right_node.var_name_tok, UnaryOpNode) or isinstance(
-                    node.right_node.var_name_tok, BinOpNode
+                if isinstance(node.right_node.node, UnaryOpNode) or isinstance(
+                    node.right_node.node, BinOpNode
                 ):
-                    key = res.register(
-                        self.visit(node.right_node.var_name_tok, context)
-                    )
+                    key = res.register(self.visit(node.right_node.node, context))
                     if res.error:
                         return res
                     if not isinstance(key, Number) and not isinstance(key.value, int):
@@ -324,8 +323,8 @@ class Interpreter:
                         return res.failure(error)
                     result.set_context(context).set_pos(node.pos_start, node.pos_end)
                     return res.success(result)
-                elif isinstance(node.right_node.var_name_tok.value, int):
-                    result, error = left.get(node.right_node.var_name_tok.value)
+                elif isinstance(node.right_node.name, int):
+                    result, error = left.get(node.right_node.name)
                     if error or result is None:
                         return res.failure(error)
                     result.set_context(context).set_pos(node.pos_start, node.pos_end)
@@ -339,7 +338,7 @@ class Interpreter:
                     )
                 )
             elif isinstance(left, String):
-                right = res.register(self.visit(node.right_node, context))
+                right = res.register(self.visit(node.right_node.node, context))
                 if res.error:
                     return res
                 result, error = left.concatenated_to(right)
@@ -348,8 +347,8 @@ class Interpreter:
                 result.set_context(context).set_pos(node.pos_start, node.pos_end)
                 return res.success(result)
             elif isinstance(left, AssociativeArray):
-                if node.right_node.var_name_tok.type == T_IDENTIFIER:
-                    right = res.register(self.visit(node.right_node, context))
+                if isinstance(node.right_node.node, VarAccessNode):
+                    right = res.register(self.visit(node.right_node.node, context))
                     if res.error:
                         return res
                     result, error = left.get(right.value)
@@ -357,7 +356,7 @@ class Interpreter:
                         return res.failure(error)
                     result.set_context(context).set_pos(node.pos_start, node.pos_end)
                     return res.success(result)
-                result, error = left.get(node.right_node.var_name_tok.value)
+                result, error = left.get(node.right_node.name)
                 if error or result is None:
                     return res.failure(error)
                 result.set_context(context).set_pos(node.pos_start, node.pos_end)
@@ -442,8 +441,8 @@ class Interpreter:
             return res
         if isinstance(compiled_access_node, AssociativeArray):
             if node.access_method == T_LSQUARE:
-                if node.key.var_name_tok.type == T_IDENTIFIER:
-                    right = res.register(self.visit(node.key, context))
+                if node.key.node.type == T_IDENTIFIER:
+                    right = res.register(self.visit(node.key.node, context))
                     if res.error:
                         return res
                     compiled_access_node.set(right.value, compiled_value)
@@ -452,14 +451,14 @@ class Interpreter:
                     )
                     return res.success(
                         "Key '{}' was assigned the value {}.".format(
-                            node.key.var_name_tok.value, compiled_value
+                            node.key.name, compiled_value
                         )
                     )
-            compiled_access_node.set(node.key.var_name_tok.value, compiled_value)
+            compiled_access_node.set(node.key.name, compiled_value)
             compiled_value.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(
                 "Key '{}' was assigned the value {}.".format(
-                    node.key.var_name_tok.value, compiled_value
+                    node.key.name, compiled_value
                 )
             )
         if isinstance(compiled_access_node, Array):
@@ -472,10 +471,10 @@ class Interpreter:
                         context,
                     )
                 )
-            if isinstance(node.key.var_name_tok, UnaryOpNode) or isinstance(
-                node.key.var_name_tok, BinOpNode
+            if isinstance(node.key.node, UnaryOpNode) or isinstance(
+                node.key.node, BinOpNode
             ):
-                key = res.register(self.visit(node.key.var_name_tok, context))
+                key = res.register(self.visit(node.key.node, context))
                 if res.error:
                     return res
                 if not isinstance(key, Number) and not isinstance(key.value, int):
@@ -498,9 +497,9 @@ class Interpreter:
                         key.value, compiled_value
                     )
                 )
-            elif isinstance(node.key.var_name_tok.value, int):
+            elif isinstance(node.key.name, int):
                 ret_code, error = compiled_access_node.set(
-                    node.key.var_name_tok.value, compiled_value
+                    node.key.name, compiled_value
                 )
                 if error:
                     return res.failure(error)
@@ -509,7 +508,7 @@ class Interpreter:
                 )
                 return res.success(
                     "Index {} was assigned the value {}.".format(
-                        node.key.var_name_tok.value, compiled_value
+                        node.key.name, compiled_value
                     )
                 )
             return res.failure(
@@ -537,8 +536,8 @@ class Interpreter:
 
         if isinstance(compiled_access_node, AssociativeArray):
             if node.access_method == T_LSQUARE:
-                if node.key.var_name_tok.type == T_IDENTIFIER:
-                    right = res.register(self.visit(node.key, context))
+                if isinstance(node.key.node, VarAccessNode):
+                    right = res.register(self.visit(node.key.node, context))
                     if res.error:
                         return res
                     value, error = compiled_access_node.get(right.value)
@@ -546,7 +545,24 @@ class Interpreter:
                         return res.failure(error)
                     value.set_context(context).set_pos(node.pos_start, node.pos_end)
                     return res.success(value)
-            if isinstance(node.key, StringNode):
+                if isinstance(node.key.node, UnaryOpNode) or isinstance(
+                    node.key.node, BinOpNode
+                ):
+                    right = res.register(self.visit(node.key.node, context))
+                    if res.error:
+                        return res
+                    value, error = compiled_access_node.get(right.value)
+                    if error or value is None:
+                        return res.failure(error)
+                    value.set_context(context).set_pos(node.pos_start, node.pos_end)
+                    return res.success(value)
+                if isinstance(node.key.node, StringNode):
+                    value, error = compiled_access_node.get(node.key.node.tok.value)
+                    if error:
+                        return res.failure(error)
+                    value.set_context(context).set_pos(node.pos_start, node.pos_end)
+                    return res.success(value)
+            if isinstance(node.key.node, StringNode):
                 return res.failure(
                     RunTimeError(
                         node.pos_start,
@@ -555,14 +571,14 @@ class Interpreter:
                         context,
                     )
                 )
-            value, error = compiled_access_node.get(node.key.var_name_tok.value)
+            value, error = compiled_access_node.get(node.key.name)
             if error or value is None:
                 return res.failure(error)
             value.set_context(context).set_pos(node.pos_start, node.pos_end)
             return res.success(value)
 
         if isinstance(compiled_access_node, String):
-            right = res.register(self.visit(node.key, context))
+            right = res.register(self.visit(node.key.name, context))
             if res.error:
                 return res
             result, error = compiled_access_node.concatenated_to(right)
@@ -581,10 +597,10 @@ class Interpreter:
                         context,
                     )
                 )
-            if isinstance(node.key.var_name_tok, UnaryOpNode) or isinstance(
-                node.key.var_name_tok, BinOpNode
+            if isinstance(node.key.node, UnaryOpNode) or isinstance(
+                node.key.node, BinOpNode
             ):
-                key = res.register(self.visit(node.key.var_name_tok, context))
+                key = res.register(self.visit(node.key.node, context))
                 if res.error:
                     return res
                 if not isinstance(key, Number) and not isinstance(key.value, int):
@@ -602,8 +618,8 @@ class Interpreter:
                 value.set_pos(node.pos_start, node.pos_end)
                 return res.success(value)
 
-            elif isinstance(node.key.var_name_tok.value, int):
-                value, error = compiled_access_node.get(node.key.var_name_tok.value)
+            elif isinstance(node.key.name, int):
+                value, error = compiled_access_node.get(node.key.name)
                 if error or value is None:
                     return res.failure(error)
                 value.set_pos(node.pos_start, node.pos_end)
@@ -633,7 +649,7 @@ class Interpreter:
             return res
         if condition.boolean:
             outputs = []
-            for statement in node.body:
+            for statement in node.if_body:
                 result = res.register(self.visit(statement, context))
                 if res.error:
                     return res
@@ -801,7 +817,6 @@ class Interpreter:
                         )
                     if timeout.value > 2147483:
                         timeout = Number(2147483, T_DECIMAL)
-
             msgbox.make_msgbox(title, text, option.value, timeout.value)
             return res.success(
                 "MsgBox with title: '{}' and text: '{}' is being displayed.".format(

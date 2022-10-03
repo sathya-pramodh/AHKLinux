@@ -1,4 +1,5 @@
 from constants import T_DOT
+from base_classes.tokens import Token
 
 
 class NumberNode:
@@ -63,7 +64,7 @@ class BinOpNode:
     def __repr__(self):
         if self.op_tok.type == T_DOT:
             return f"{self.left_node}.{self.right_node}"
-        return f"{self.left_node} {self.op_tok.type} {self.right_node}"
+        return f"{self.left_node} {self.op_tok} {self.right_node}"
 
 
 class UnaryOpNode:
@@ -146,7 +147,23 @@ class ObjectAccessNode:
         self.pos_end = self.access_node.pos_end
 
     def __repr__(self):
-        return f"{self.access_node}.{self.key}"
+        return f"{self.access_node} {self.access_method} {self.key}"
+
+
+class ObjectKeyNode:
+    def __init__(self, node):
+        self.node = node
+        if isinstance(self.node, Token):
+            self.name = self.node.value
+        elif isinstance(self.node, UnaryOpNode) or isinstance(self.node, BinOpNode):
+            self.name = None
+        else:
+            self.name = self.node.tok.value
+        self.pos_start = self.node.pos_start
+        self.pos_end = self.node.pos_end
+
+    def __repr__(self):
+        return f"{self.node}"
 
 
 class IfNode:
@@ -224,6 +241,8 @@ class CommandNode:
     def __init__(self, name, **kwargs):
         self.name = name
         self.args = kwargs
+        self.pos_start = name.pos_start
+        self.pos_end = name.pos_end
 
     def __repr__(self):
         return f"{self.name} {self.args}"

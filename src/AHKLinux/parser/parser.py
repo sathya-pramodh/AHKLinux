@@ -7,6 +7,7 @@ Grammar:
              : IDENTIFIER (DOT IDENTIFIER)* (LSQUARE (expression)? RSQUARE)* (ASSIGNMENT expression)*
              : IDENTIFIER L_ASSIGNMENT U_STRING
              : command-expr
+             : block-comment
     expression: term (PLUS|MINUS term)*
               : STRING (DOT STRING)*
               : term QUESTION_MARK expression COLON expression
@@ -20,7 +21,6 @@ Grammar:
          : LPAREN expr RPAREN
          : array-expr
          : associative-array-expr
-         : block-comment
     array-expr : LSQUARE (expr (COMMA expr)*)? RSQUARE (LSQUARE (expression)? RSQUARE)*
     associative-array-expr : LCURVE (expression (COMMA expression)*)? RCURVE (LSQUARE (expression)? RSQUARE)*
     if-expr : KEYWORD:if expression (KEYWORD:and|or expression)* LCURVE expression (EOL expression)* (KEYWORD:else LCURVE expression (EOL expression)* RCURVE)?
@@ -83,14 +83,10 @@ class Parser:
                     op_tok = self.current_tok
                     res.register_advancement()
                     self.advance()
-                    if self.current_tok.type == T_STRING:
-                        accumulator = BinOpNode(
-                            accumulator, op_tok, StringNode(self.current_tok)
-                        )
-                    else:
-                        accumulator = BinOpNode(
-                            accumulator, op_tok, VarAccessNode(self.current_tok)
-                        )
+                    access_method = T_DOT
+                    accumulator = BinOpNode(
+                        accumulator, op_tok, ObjectKeyNode(self.current_tok)
+                    )
                     res.register_advancement()
                     self.advance()
                 else:
@@ -128,12 +124,10 @@ class Parser:
                     )
                 res.register_advancement()
                 self.advance()
-                if isinstance(inner_key, VarAccessNode):
-                    accumulator = BinOpNode(accumulator, Token(T_LSQUARE), inner_key)
-                else:
-                    accumulator = BinOpNode(
-                        accumulator, Token(T_LSQUARE), VarAccessNode(inner_key)
-                    )
+                access_method = T_LSQUARE
+                accumulator = BinOpNode(
+                    accumulator, Token(T_LSQUARE), ObjectKeyNode(inner_key)
+                )
         if self.current_tok.type == T_ASSIGNMENT:
             if disable_assignment:
                 return res.failure(
@@ -303,7 +297,7 @@ class Parser:
             while True:
                 if self.current_tok.type in (T_RCURVE, T_EOF):
                     break
-                statement = res.register(self.expression())
+                statement = res.register(self.statement())
                 if res.error:
                     return res
                 else_body.append(statement)
@@ -321,7 +315,7 @@ class Parser:
             return res.success(IfElseNode(condition_node, if_body, else_body))
         res.register_recession()
         self.recede()
-        if self.current_tok.type != T_EOL:
+        if self.current_tok.type not in (T_EOL, T_EOF):
             res.register_advancement()
             self.advance()
         return res.success(IfNode(condition_node, if_body))
@@ -400,12 +394,12 @@ class Parser:
             return res.success(FunctionDeclareNode(var_name, params, body))
         res.register_recession()
         self.recede()
-        if self.current_tok.type != T_EOL:
+        if self.current_tok.type not in (T_EOL, T_EOF):
             res.register_advancement()
             self.advance()
         return res.success(FunctionCallNode(var_name, params))
 
-    def make_u_string(self, name, check_commas=True):
+    def make_u_string(self, check_commas=True):
         res = ParseResult()
         string = ""
         condition = (T_COMMA, T_EOL) if check_commas else (T_EOL,)
@@ -497,9 +491,9 @@ class Parser:
                 if self.current_tok.type == T_LSQUARE:
                     res.register_advancement()
                     self.advance()
-                    key = self.current_tok
-                    res.register_advancement()
-                    self.advance()
+                    key = res.register(self.expression())
+                    if res.error:
+                        return res
                     if self.current_tok.type != T_RSQUARE:
                         return res.failure(
                             InvalidSyntaxError(
@@ -513,8 +507,8 @@ class Parser:
                     self.advance()
                     accumulator = BinOpNode(
                         ArrayNode(value_nodes, tok.pos_start, end_tok.pos_end),
-                        Token(T_DOT),
-                        VarAccessNode(key),
+                        Token(T_LSQUARE),
+                        ObjectKeyNode(key),
                     )
                     access_method = T_LSQUARE
                     res = self.get_keys(
@@ -591,9 +585,9 @@ class Parser:
                 if self.current_tok.type == T_LSQUARE:
                     res.register_advancement()
                     self.advance()
-                    key = self.current_tok
-                    res.register_advancement()
-                    self.advance()
+                    key = res.register(self.expression())
+                    if res.error:
+                        return res
                     if self.current_tok.type != T_RSQUARE:
                         return res.failure(
                             InvalidSyntaxError(
@@ -609,8 +603,8 @@ class Parser:
                         AssociativeArrayNode(
                             value_nodes, tok.pos_start, end_tok.pos_end
                         ),
-                        Token(T_DOT),
-                        VarAccessNode(key),
+                        Token(T_LSQUARE),
+                        ObjectKeyNode(key),
                     )
                     access_method = T_LSQUARE
                     res = self.get_keys(
@@ -632,7 +626,7 @@ class Parser:
                             value_nodes, tok.pos_start, end_tok.pos_end
                         ),
                         Token(T_DOT),
-                        VarAccessNode(key),
+                        ObjectKeyNode(key),
                     )
                     access_method = T_DOT
                     res = self.get_keys(
@@ -648,17 +642,6 @@ class Parser:
                     value_nodes, tok.pos_start, self.current_tok.pos_end
                 )
             )
-
-        elif tok.type == T_BCOMMENT_START:
-            self.recede()
-            previous_tok = self.current_tok
-            self.advance()
-            self.advance()
-            if (previous_tok.type == T_EOL or previous_tok.type == T_SOF) and (
-                self.current_tok.type == T_EOL or self.current_tok.type == T_EOF
-            ):
-                self.advance()
-                return self.ignore_block_comment()
 
         return res.failure(
             InvalidSyntaxError(
@@ -705,12 +688,7 @@ class Parser:
                 inner_key = res.register(self.expression())
                 if res.error or inner_key is None:
                     return res
-                if isinstance(inner_key, VarAccessNode):
-                    accumulator = BinOpNode(VarAccessNode(var_name), op_tok, inner_key)
-                else:
-                    accumulator = BinOpNode(
-                        VarAccessNode(var_name), op_tok, VarAccessNode(inner_key)
-                    )
+                accumulator = BinOpNode(VarAccessNode(var_name), op_tok, inner_key)
                 if self.current_tok.type != T_RSQUARE:
                     return res.failure(
                         InvalidSyntaxError(
@@ -794,12 +772,12 @@ class Parser:
             expr = res.register(self.expression())
             if res.error:
                 return res
-            if self.current_tok.type != T_EOL:
+            if self.current_tok.type not in (T_EOL, T_EOF):
                 return res.failure(
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        "Expected end of line.",
+                        "Expected end of line or file.",
                         self.context,
                     )
                 )
@@ -814,12 +792,12 @@ class Parser:
                 node = res.register(self.expression())
                 if res.error:
                     return res
-                if self.current_tok.type != T_EOL:
+                if self.current_tok.type not in (T_EOL, T_EOF):
                     return res.failure(
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            "Expected end of line.",
+                            "Expected end of line or file.",
                             self.context,
                         )
                     )
@@ -833,12 +811,12 @@ class Parser:
             res.register_advancement()
             self.advance()
             res = self.if_expr(pos_start)
-            if self.current_tok.type != T_EOL:
+            if self.current_tok.type not in (T_EOL, T_EOF):
                 return res.failure(
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        "Expected end of line.",
+                        "Expected end of line or file.",
                         self.context,
                     )
                 )
@@ -854,12 +832,12 @@ class Parser:
                 res.register_advancement()
                 self.advance()
                 res = self.function_expr(var_name)
-                if self.current_tok.type != T_EOL:
+                if self.current_tok.type not in (T_EOL, T_EOF):
                     return res.failure(
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            "Expected end of line.",
+                            "Expected end of line or file.",
                             self.context,
                         )
                     )
@@ -873,12 +851,12 @@ class Parser:
                 expr = res.register(self.expression())
                 if res.error:
                     return res
-                if self.current_tok.type != T_EOL:
+                if self.current_tok.type not in (T_EOL, T_EOF):
                     return res.failure(
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            "Expected end of line.",
+                            "Expected end of line or file.",
                             self.context,
                         )
                     )
@@ -901,12 +879,12 @@ class Parser:
                 value_node = StringNode(self.current_tok, quoted=False)
                 res.register_advancement()
                 self.advance()
-                if self.current_tok.type != T_EOL:
+                if self.current_tok.type not in (T_EOL, T_EOF):
                     return res.failure(
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            "Expected end of line.",
+                            "Expected end of line or file.",
                             self.context,
                         )
                     )
@@ -918,19 +896,9 @@ class Parser:
                 op_tok = self.current_tok
                 res.register_advancement()
                 self.advance()
-                if self.current_tok.type == T_STRING:
-                    return res.failure(
-                        InvalidSyntaxError(
-                            var_name.pos_start,
-                            self.current_tok.pos_end,
-                            "Expected a statement.",
-                            self.context,
-                        )
-                    )
+                inner_key = self.current_tok
                 accumulator = BinOpNode(
-                    VarAccessNode(var_name),
-                    op_tok,
-                    VarAccessNode(self.current_tok),
+                    VarAccessNode(var_name), op_tok, ObjectKeyNode(inner_key)
                 )
                 res.register_advancement()
                 self.advance()
@@ -938,12 +906,12 @@ class Parser:
                 res = self.get_keys(
                     accumulator, access_method, res, var_name, disable_access=True
                 )
-                if self.current_tok.type != T_EOL:
+                if self.current_tok.type not in (T_EOL, T_EOF):
                     return res.failure(
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            "Expected end of line.",
+                            "Expected end of line or file.",
                             self.context,
                         )
                     )
@@ -958,15 +926,8 @@ class Parser:
                 inner_key = res.register(self.expression())
                 if res.error or inner_key is None:
                     return res
-                if isinstance(inner_key, VarAccessNode):
-                    accumulator = BinOpNode(VarAccessNode(var_name), op_tok, inner_key)
+                accumulator = BinOpNode(VarAccessNode(var_name), op_tok, inner_key)
 
-                else:
-                    accumulator = BinOpNode(
-                        VarAccessNode(var_name),
-                        op_tok,
-                        VarAccessNode(inner_key),
-                    )
                 if self.current_tok.type != T_RSQUARE:
                     return res.failure(
                         InvalidSyntaxError(
@@ -982,12 +943,12 @@ class Parser:
                 res = self.get_keys(
                     accumulator, access_method, res, var_name, disable_access=True
                 )
-                if self.current_tok.type != T_EOL:
+                if self.current_tok.type not in (T_EOL, T_EOF):
                     return res.failure(
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            "Expected end of line.",
+                            "Expected end of line or file.",
                             self.context,
                         )
                     )
@@ -1005,7 +966,7 @@ class Parser:
                 if res.error:
                     return res
                 return res.success(CommandNode(name, text=text))
-            elif self.current_tok.type == T_COMMA:
+            if self.current_tok.type == T_COMMA:
                 res.register_advancement()
                 self.advance()
                 if self.current_tok.type not in (T_DECIMAL, T_HEXADECIMAL):
@@ -1034,7 +995,7 @@ class Parser:
                 if self.current_tok.type == T_COMMA:
                     res.register_advancement()
                     self.advance()
-                    text = self.make_u_string(name, check_commas=True)
+                    text = self.make_u_string(check_commas=True)
                     if self.current_tok.type == T_COMMA:
                         res.register_advancement()
                         self.advance()
@@ -1050,24 +1011,24 @@ class Parser:
                         timeout = NumberNode(self.current_tok)
                         res.register_advancement()
                         self.advance()
-                        if self.current_tok.type != T_EOL:
+                        if self.current_tok.type not in (T_EOL, T_EOF):
                             return res.failure(
                                 InvalidSyntaxError(
                                     name.pos_start,
                                     self.current_tok.pos_end,
-                                    "Expected end of line.",
+                                    "Expected end of line or file.",
                                     self.context,
                                 )
                             )
                         return res.success(
                             CommandNode(name, option=option, text=text, timeout=timeout)
                         )
-                    if self.current_tok.type != T_EOL:
+                    if self.current_tok.type not in (T_EOL, T_EOF):
                         return res.failure(
                             InvalidSyntaxError(
                                 name.pos_start,
                                 self.current_tok.pos_end,
-                                "Expected end of line.",
+                                "Expected end of line or file.",
                                 self.context,
                             )
                         )
@@ -1095,12 +1056,12 @@ class Parser:
                             timeout = res.register(self.expression())
                             if res.error:
                                 return res
-                            if self.current_tok.type != T_EOL:
+                            if self.current_tok.type not in (T_EOL, T_EOF):
                                 return res.failure(
                                     InvalidSyntaxError(
                                         name.pos_start,
                                         self.current_tok.pos_end,
-                                        "Expected end of line.",
+                                        "Expected end of line or file.",
                                         self.context,
                                     )
                                 )
@@ -1125,12 +1086,12 @@ class Parser:
                         timeout = NumberNode(self.current_tok)
                         res.register_advancement()
                         self.advance()
-                        if self.current_tok.type != T_EOL:
+                        if self.current_tok.type not in (T_EOL, T_EOF):
                             return res.failure(
                                 InvalidSyntaxError(
                                     name.pos_start,
                                     self.current_tok.pos_end,
-                                    "Expected end of line.",
+                                    "Expected end of line or file.",
                                     self.context,
                                 )
                             )
@@ -1143,12 +1104,12 @@ class Parser:
                                 timeout=timeout,
                             )
                         )
-                    if self.current_tok.type != T_EOL:
+                    if self.current_tok.type not in (T_EOL, T_EOF):
                         return res.failure(
                             InvalidSyntaxError(
                                 name.pos_start,
                                 self.current_tok.pos_end,
-                                "Expected end of line.",
+                                "Expected end of line or file.",
                                 self.context,
                             )
                         )
@@ -1157,8 +1118,32 @@ class Parser:
                     return res.success(
                         CommandNode(name, option=option, title=title, text=text)
                     )
-            text = self.make_u_string(name, check_commas=False)
-            return res.success(CommandNode(name, text=text))
+            pos_start = self.current_tok.pos_start
+            text = self.make_u_string(check_commas=False)
+            node = StringNode(Token(T_STRING, text, pos_start=pos_start))
+            if self.current_tok.type not in (T_EOL, T_EOF):
+                return res.failure(
+                    InvalidSyntaxError(
+                        name.pos_start,
+                        self.current_tok.pos_end,
+                        "Expected end of line or file.",
+                        self.context,
+                    )
+                )
+            res.register_advancement()
+            self.advance()
+            return res.success(CommandNode(name, text=node))
+
+        elif self.current_tok.type == T_BCOMMENT_START:
+            self.recede()
+            previous_tok = self.current_tok
+            self.advance()
+            self.advance()
+            if (previous_tok.type == T_EOL or previous_tok.type == T_SOF) and (
+                self.current_tok.type == T_EOL or self.current_tok.type == T_EOF
+            ):
+                self.advance()
+                return self.ignore_block_comment()
 
         elif self.current_tok.type in (T_EOL, T_EOF, T_SOF):
             res.register_advancement()
