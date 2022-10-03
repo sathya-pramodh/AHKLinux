@@ -87,6 +87,7 @@ f(){
 f()
 ```
 - MsgBox can display Arrays, Associative arrays and objects also.
+- Example:
 ```
 /*
 This line below would display a blank message box on Windows
