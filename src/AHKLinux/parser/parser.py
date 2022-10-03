@@ -688,7 +688,9 @@ class Parser:
                 inner_key = res.register(self.expression())
                 if res.error or inner_key is None:
                     return res
-                accumulator = BinOpNode(VarAccessNode(var_name), op_tok, inner_key)
+                accumulator = BinOpNode(
+                    VarAccessNode(var_name), op_tok, ObjectKeyNode(inner_key)
+                )
                 if self.current_tok.type != T_RSQUARE:
                     return res.failure(
                         InvalidSyntaxError(
@@ -707,6 +709,21 @@ class Parser:
                     res,
                     var_name,
                     disable_assignment=True,
+                )
+                return res
+
+            if self.current_tok.type == T_DOT:
+                op_tok = self.current_tok
+                res.register_advancement()
+                self.advance()
+                accumulator = BinOpNode(
+                    VarAccessNode(var_name), op_tok, ObjectKeyNode(self.current_tok)
+                )
+                res.register_advancement()
+                self.advance()
+                access_method = T_DOT
+                res = self.get_keys(
+                    accumulator, access_method, res, var_name, disable_assignment=True
                 )
                 return res
 

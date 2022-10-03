@@ -9,6 +9,7 @@ BASE_DEBUG_CMD = "python3 cli.py --input {} -d"
 BASE_CMD = "python3 cli.py --input {}"
 MSGBOX_OUTPUT_FORMAT = "MsgBox with title: '{}' and text: '{}' is being displayed.\n"
 ASSIGN_OUTPUT_FORMAT = "'{}' inside '{}' has been assigned the value {}.\n"
+KEY_ASSIGN_OUTPUT_FORMAT = "Key '{}' was assigned the value {}.\n"
 ERROR_FORMAT = (
     "Traceback (most recent call last):\n File: '{}', line {}, in {}\n   {}\n{}\n"
 )
@@ -89,6 +90,35 @@ class TestBoolean(unittest.TestCase):
 
     def test_not_op(self):
         file = "tests/boolean/not.ahk"
+        self.assertEqual(main.main(file, False), 0)
+
+
+class TestStrings(unittest.TestCase):
+    def test_debug_declaration(self):
+        file = "tests/string/declare.ahk"
+        result, expected_result = exec_msgbox_debug_cmd(file, "This is a test.")
+        self.assertEqual(result, expected_result)
+
+    def test_declaration(self):
+        file = "tests/string/declare.ahk"
+        self.assertEqual(main.main(file, False), 0)
+
+    def test_debug_concat(self):
+        file = "tests/string/concat.ahk"
+        result, expected_result = exec_msgbox_debug_cmd(file, "Hello, World!")
+        self.assertEqual(result, expected_result)
+
+    def test_concat(self):
+        file = "tests/string/concat.ahk"
+        self.assertEqual(main.main(file, False), 0)
+
+    def test_debug_multi_concat(self):
+        file = "tests/string/multi_concat.ahk"
+        result, expected_result = exec_msgbox_debug_cmd(file, "Hello, World!")
+        self.assertEqual(result, expected_result)
+
+    def test_multi_concat(self):
+        file = "tests/string/multi_concat.ahk"
         self.assertEqual(main.main(file, False), 0)
 
 
@@ -175,14 +205,33 @@ class TestAssociativeArrays(unittest.TestCase):
     def test_combined_access(self):
         file = "tests/associative_array/combined_access.ahk"
         self.assertEqual(main.main(file, False), 0)
-    
+
     def test_debug_combined_alt_access(self):
         file = "tests/associative_array/combined_alt_access.ahk"
         result, expected_result = exec_msgbox_debug_cmd(file, 1)
         self.assertEqual(result, expected_result)
-    
+
     def test_combined_alt_access(self):
         file = "tests/associative_array/combined_alt_access.ahk"
+        self.assertEqual(main.main(file, False), 0)
+
+    def test_debug_assign(self):
+        file = "tests/associative_array/assign.ahk"
+        cmd = BASE_DEBUG_CMD.format(file).split()
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        expected_result = (
+            ASSIGN_OUTPUT_FORMAT.format("a", "<module>", "{}")
+            + KEY_ASSIGN_OUTPUT_FORMAT.format("a", "{b:1}")
+            + KEY_ASSIGN_OUTPUT_FORMAT.format("b", 10)
+        )
+        if stderr:
+            self.assertEqual(stderr.decode("UTF-8"), expected_result)
+        else:
+            self.assertEqual(stdout.decode("UTF-8"), expected_result)
+
+    def test_assign(self):
+        file = "tests/associative_array/assign.ahk"
         self.assertEqual(main.main(file, False), 0)
 
 
@@ -208,9 +257,26 @@ class TestVariable(unittest.TestCase):
         cmd = BASE_DEBUG_CMD.format(file).split()
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()
-        expected_result = ASSIGN_OUTPUT_FORMAT.format(
-            "a", "<module>", 20
-        ) + MSGBOX_OUTPUT_FORMAT.format(file, 10.0)
+        expected_result = (
+            ASSIGN_OUTPUT_FORMAT.format("a", "<module>", 20)
+            + MSGBOX_OUTPUT_FORMAT.format(file, 10.0)
+            + ASSIGN_OUTPUT_FORMAT.format("a", "<module>", "[1,2,3]")
+            + MSGBOX_OUTPUT_FORMAT.format(file, 1)
+            + ASSIGN_OUTPUT_FORMAT.format("a", "<module>", "[[1,2,3],[4,5,6]]")
+            + MSGBOX_OUTPUT_FORMAT.format(file, 1)
+            + ASSIGN_OUTPUT_FORMAT.format("a", "<module>", "{a:1}")
+            + MSGBOX_OUTPUT_FORMAT.format(file, 1)
+            + ASSIGN_OUTPUT_FORMAT.format("a", "<module>", "{a:{b:1}}")
+            + MSGBOX_OUTPUT_FORMAT.format(file, 1)
+            + ASSIGN_OUTPUT_FORMAT.format("a", "<module>", "Hello, World!")
+            + MSGBOX_OUTPUT_FORMAT.format(file, "Hello, World!")
+            + ASSIGN_OUTPUT_FORMAT.format("a", "<module>", "Hello, World!")
+            + MSGBOX_OUTPUT_FORMAT.format(file, "Hello, World!")
+            + ASSIGN_OUTPUT_FORMAT.format("a", "<module>", "Hello")
+            + MSGBOX_OUTPUT_FORMAT.format(file, "Hello, World!")
+            + ASSIGN_OUTPUT_FORMAT.format("a", "<module>", ", World!")
+            + MSGBOX_OUTPUT_FORMAT.format(file, "Hello, World!")
+        )
         if stderr:
             self.assertEqual(stderr.decode("UTF-8"), expected_result)
         else:

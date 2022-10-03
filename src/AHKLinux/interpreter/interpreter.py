@@ -7,8 +7,10 @@ from base_classes.nodes import (
     VarAccessNode,
     UnaryOpNode,
     BinOpNode,
+    ObjectKeyNode,
     NumberNode,
 )
+from base_classes.tokens import Token
 from base_classes.symbol_table import SymbolTable
 from constants import *
 from data_types.array import Array
@@ -270,7 +272,15 @@ class Interpreter:
             )
         elif node.op_tok.type == T_DOT:
             if isinstance(left, String):
-                right = res.register(self.visit(node.right_node.node, context))
+                if isinstance(node.right_node, ObjectKeyNode):
+                    if isinstance(node.right_node.node, Token):
+                        right = res.register(
+                            self.visit(VarAccessNode(node.right_node.node)), context
+                        )
+                    else:
+                        right = res.register(self.visit(node.right_node.node, context))
+                else:
+                    right = res.register(self.visit(node.right_node, context))
                 if res.error:
                     return res
                 result, error = left.concatenated_to(right)
@@ -338,7 +348,15 @@ class Interpreter:
                     )
                 )
             elif isinstance(left, String):
-                right = res.register(self.visit(node.right_node.node, context))
+                if isinstance(node.right_node, ObjectKeyNode):
+                    if isinstance(node.right_node.node, Token):
+                        right = res.register(
+                            VarAccessNode(node.right_node.node), context
+                        )
+                    else:
+                        right = res.register(self.visit(node.right_node.node, context))
+                else:
+                    right = res.register(self.visit(node.right_node, context))
                 if res.error:
                     return res
                 result, error = left.concatenated_to(right)
@@ -578,7 +596,16 @@ class Interpreter:
             return res.success(value)
 
         if isinstance(compiled_access_node, String):
-            right = res.register(self.visit(node.key.name, context))
+            if isinstance(node.key.node, Token):
+                if node.key.node.type == T_IDENTIFIER:
+                    right = res.register(self.visit(VarAccessNode(node.key.node), context))
+                elif node.key.node.type == T_STRING:
+                    right = res.register(self.visit(StringNode(node.key.node), context))
+                elif node.key.node.type == T_DECIMAL or node.key.node.type == T_HEXADECIMAL:
+                    right = res.register(self.visit(NumberNode(node.key.node, type_=node.key.node.type)), context)
+            else:
+                right = res.register(self.visit(node.key.node, context))
+
             if res.error:
                 return res
             result, error = compiled_access_node.concatenated_to(right)
@@ -773,11 +800,14 @@ class Interpreter:
             timeout = Number(2147483, T_DECIMAL)
             for key, value in node.args.items():
                 if key == "text" and value is not None:
-                    text = res.register(self.visit(value, context))
-                    if res.error:
-                        return res
+                    if not isinstance(value, str):
+                        text = res.register(self.visit(value, context))
+                        if res.error:
+                            return res
+                    else:
+                        text = value
                 elif key == "title" and value is not None:
-                    if not isinstance(title, str):
+                    if not isinstance(value, str):
                         title = res.register(self.visit(value, context))
                         if res.error:
                             return res
