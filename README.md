@@ -86,6 +86,14 @@ f(){
 }
 f()
 ```
+- MsgBox can display Arrays, Associative arrays and objects also.
+```
+/*
+This line below would display a blank message box on Windows
+But doesn't while using this interpreter.
+*/
+MsgBox % [1,2,3]
+```
 
 # Developer Instructions
 ## Startup Command
