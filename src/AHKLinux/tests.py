@@ -10,6 +10,7 @@ BASE_CMD = "python3 cli.py --input {}"
 MSGBOX_OUTPUT_FORMAT = "MsgBox with title: '{}' and text: '{}' is being displayed.\n"
 ASSIGN_OUTPUT_FORMAT = "'{}' inside '{}' has been assigned the value {}.\n"
 KEY_ASSIGN_OUTPUT_FORMAT = "Key '{}' was assigned the value {}.\n"
+FUNC_DECLARE_OUTPUT_FORMAT = "Function with name '{}' has been declared.\n"
 ERROR_FORMAT = (
     "Traceback (most recent call last):\n File: '{}', line {}, in {}\n   {}\n{}\n"
 )
@@ -90,6 +91,15 @@ class TestBoolean(unittest.TestCase):
 
     def test_not_op(self):
         file = "tests/boolean/not.ahk"
+        self.assertEqual(main.main(file, False), 0)
+
+    def test_debug_ternary_op(self):
+        file = "tests/boolean/ternary.ahk"
+        result, expected_result = exec_msgbox_debug_cmd(file, "This is true.")
+        self.assertEqual(result, expected_result)
+
+    def test_ternary_op(self):
+        file = "tests/boolean/ternary.ahk"
         self.assertEqual(main.main(file, False), 0)
 
 
@@ -325,6 +335,56 @@ class TestStatements(unittest.TestCase):
 
     def test_if_else(self):
         file = "tests/statements/if_else.ahk"
+        self.assertEqual(main.main(file, False), 0)
+
+
+class TestFunctions(unittest.TestCase):
+    def test_debug_declare(self):
+        file = "tests/functions/declare.ahk"
+        cmd = BASE_DEBUG_CMD.format(file).split()
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        expected_result = FUNC_DECLARE_OUTPUT_FORMAT.format("func")
+        if stderr:
+            self.assertEqual(stderr.decode("UTF-8"), expected_result)
+        self.assertEqual(stdout.decode("UTF-8"), expected_result)
+
+    def test_declare(self):
+        file = "tests/functions/declare.ahk"
+        self.assertEqual(main.main(file, False), 0)
+
+    def test_debug_access(self):
+        file = "tests/functions/access.ahk"
+        cmd = BASE_DEBUG_CMD.format(file).split()
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        expected_result = FUNC_DECLARE_OUTPUT_FORMAT.format("func") + "\n"
+        if stderr:
+            self.assertEqual(stderr.decode("UTF-8"), expected_result)
+        self.assertEqual(stdout.decode("UTF-8"), expected_result)
+
+    def test_access(self):
+        file = "tests/functions/access.ahk"
+        self.assertEqual(main.main(file, False), 0)
+
+    def test_debug_scope(self):
+        file = "tests/functions/scope.ahk"
+        cmd = BASE_DEBUG_CMD.format(file).split()
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        expected_result = (
+            ASSIGN_OUTPUT_FORMAT.format("c", "<module>", 10)
+            + FUNC_DECLARE_OUTPUT_FORMAT.format("func")
+            + ASSIGN_OUTPUT_FORMAT.format("c", "func", 30)
+            + "\n"
+            + MSGBOX_OUTPUT_FORMAT.format(file, 30)
+        )
+        if stderr:
+            self.assertEqual(stderr.decode("UTF-8"), expected_result)
+        self.assertEqual(stdout.decode("UTF-8"), expected_result)
+
+    def test_scope(self):
+        file = "tests/functions/scope.ahk"
         self.assertEqual(main.main(file, False), 0)
 
 

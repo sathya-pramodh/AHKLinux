@@ -1,0 +1,1 @@
+MsgBox % (true) ? "This is true." : "This is false."
