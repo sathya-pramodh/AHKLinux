@@ -1,20 +1,22 @@
+from typing import Any, Self
+
 from base_classes.value import Value
-from data_types.boolean import Boolean
 from constants import DIGITS, LETTERS, T_DECIMAL
+from data_types.boolean import Boolean
 from data_types.number import Number
 from data_types.string import String
 from error_classes.runtime_error import RunTimeError
 
 
 class AssociativeArray(Value):
-    def __init__(self, value):
+    def __init__(self, value: dict[Any, Any]) -> None:
         super().__init__()
-        self.value = value
-        self.boolean = True if self.value else False
-        self.repr_boolean = Boolean("true") if self.value else Boolean("false")
+        self.value: dict[Any, Any] = value
+        self.boolean: bool = True if self.value else False
+        self.repr_boolean: Boolean = Boolean("true") if self.value else Boolean("false")
 
-    def set(self, key, value):
-        for key_, value_ in self.value.items():
+    def set(self, key: str, value: Any) -> None:
+        for key_ in self.value:
             if key_.value == key:
                 self.value[key_] = value
                 break
@@ -24,8 +26,8 @@ class AssociativeArray(Value):
             elif key in LETTERS + "_":
                 self.value[String(key)] = value
 
-    def get(self, key):
-        for key_, value_ in self.value.items():
+    def get(self, key) -> tuple[Any | None, RunTimeError | None]:
+        for key_ in self.value:
             if key_.value == key:
                 return self.value[key_], None
         return None, RunTimeError(
@@ -35,13 +37,13 @@ class AssociativeArray(Value):
             self.context,
         )
 
-    def copy(self):
-        copy = AssociativeArray(self.value)
+    def copy(self) -> Self:
+        copy: AssociativeArray = AssociativeArray(self.value)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
         return copy
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         rep_str = "{"
         count_ = 0
         for key, value in self.value.items():

@@ -1,23 +1,36 @@
-class Error:
-    def __init__(self, pos_start, pos_end, error_name, details, context):
-        self.pos_start = pos_start
-        self.pos_end = pos_end
-        self.error_name = error_name
-        self.details = details
-        self.context = context
+from base_classes.context import Context
+from base_classes.position import Position
 
-    def as_string(self):
-        result = self.generate_traceback()
+
+class Error:
+    def __init__(
+        self,
+        pos_start: Position,
+        pos_end: Position,
+        error_name: str,
+        details: str,
+        context: Context,
+    ) -> None:
+        self.pos_start: Position = pos_start
+        self.pos_end: Position = pos_end
+        self.error_name: str = error_name
+        self.details: str = details
+        self.context: Context = context
+
+    def as_string(self) -> str:
+        result: str = self.generate_traceback()
         result += "{}: {}\n".format(self.error_name, self.details)
         return result
 
-    def generate_traceback(self):
-        result = ""
-        pos = self.pos_start
-        context = self.context
+    def generate_traceback(self) -> str:
+        result: str = ""
+        pos: Position = self.pos_start
+        context: Context = self.context
 
-        def get_call_stack(context, pos, result):
-            if not context:
+        def get_call_stack(
+            context: Context | None, pos: Position | None, result: str
+        ) -> str:
+            if not context or not pos:
                 return result
             result = get_call_stack(context.parent, context.parent_entry_pos, result)
             result += " File: '{}', line {}, in {}\n".format(

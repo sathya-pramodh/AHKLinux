@@ -29,24 +29,27 @@ Grammar:
     block-comment : BCOMMENT_START .* BCOMMENT_END
     command-expr : COMMAND (COMMA expression|U_STRING)*
 """
-from constants import *
+from base_classes.context import Context
 from base_classes.nodes import *
-from parser.parse_result import ParseResult
-from error_classes.invalid_syntax_error import InvalidSyntaxError
 from base_classes.tokens import Token
+from constants import *
+from error_classes.invalid_syntax_error import InvalidSyntaxError
+from parser.parse_result import ParseResult
 
 
 class Parser:
-    def __init__(self, tokens, context):
-        self.tokens = tokens
-        self.tok_idx = 0
-        self.context = context
-        self.current_tok = self.tokens[self.tok_idx]
+    def __init__(self, tokens: list[Token], context: Context) -> None:
+        self.tokens: list[Token] = tokens
+        self.tok_idx: int = 0
+        self.context: Context = context
+        self.current_tok: Token = self.tokens[self.tok_idx]
 
-    def parse(self):
-        ast = []
+    def parse(self) -> tuple[list[ParseResult], None]:
+        ast: list[ParseResult] = []
         while self.tok_idx < len(self.tokens):
-            res = self.statement()
+            res: ParseResult = self.statement()
+            if res is None or res.error:
+                continue
             if res.error:
                 return [], res.error
             if res.node is None:
@@ -56,31 +59,31 @@ class Parser:
                 break
         return ast, None
 
-    def advance(self):
+    def advance(self) -> None:
         self.tok_idx += 1
         if self.tok_idx < len(self.tokens):
             self.current_tok = self.tokens[self.tok_idx]
 
-    def recede(self):
+    def recede(self) -> None:
         if self.tok_idx - 1 >= 0:
             self.tok_idx -= 1
             self.current_tok = self.tokens[self.tok_idx]
 
     def get_keys(
         self,
-        accumulator,
-        access_method,
-        res,
-        var_name,
-        disable_assignment=False,
-        disable_access=False,
-        disable_dot=False,
+        accumulator: BinOpNode,
+        access_method: str,
+        res: ParseResult,
+        var_name: Token,
+        disable_assignment: bool = False,
+        disable_access: bool = False,
+        disable_dot: bool = False,
     ):
-        ops = [T_LSQUARE] if disable_dot else [T_DOT, T_LSQUARE]
+        ops: list[str] = [T_LSQUARE] if disable_dot else [T_DOT, T_LSQUARE]
         while self.current_tok.type in ops:
             if self.current_tok.type == T_DOT:
                 if not disable_dot:
-                    op_tok = self.current_tok
+                    op_tok: Token = self.current_tok
                     res.register_advancement()
                     self.advance()
                     access_method = T_DOT
@@ -110,7 +113,7 @@ class Parser:
                             self.context,
                         )
                     )
-                inner_key = res.register(self.expression())
+                inner_key: Any = res.register(self.expression())
                 if res.error:
                     return res
                 if self.current_tok.type != T_RSQUARE:
@@ -140,7 +143,7 @@ class Parser:
                 )
             res.register_advancement()
             self.advance()
-            value = res.register(self.expression())
+            value: Any = res.register(self.expression())
             if res.error:
                 return res
             return res.success(
@@ -163,12 +166,12 @@ class Parser:
             )
         )
 
-    def ignore_block_comment(self):
-        res = ParseResult()
+    def ignore_block_comment(self) -> ParseResult:
+        res: ParseResult = ParseResult()
         while self.current_tok.type != T_BCOMMENT_END:
             self.advance()
         self.recede()
-        previous_tok = self.current_tok
+        previous_tok: Token = self.current_tok
         self.advance()
         self.advance()
         if (previous_tok.type == T_EOL or previous_tok.type == T_SOF) and (
@@ -179,50 +182,50 @@ class Parser:
         else:
             return self.ignore_block_comment()
 
-    def bin_op(self, func, ops):
+    def bin_op(self, func: Any, ops: list[str]):
         res = ParseResult()
-        left = res.register(func())
+        left: Any = res.register(func())
         if res.error:
             return res
 
         while self.current_tok.type in ops:
-            op_tok = self.current_tok
+            op_tok: Token = self.current_tok
             res.register_advancement()
             self.advance()
-            right = res.register(func())
+            right: Any = res.register(func())
             if res.error:
                 return res
-            left = BinOpNode(left, op_tok, right)
+            left: Any = BinOpNode(left, op_tok, right)
 
         return res.success(left)
 
-    def get_condition(self):
-        res = ParseResult()
-        left = res.register(self.expression())
+    def get_condition(self) -> ParseResult:
+        res: ParseResult = ParseResult()
+        left: Any = res.register(self.expression())
         if res.error or left is None:
             return res
-        cond = self.current_tok.matches(T_KEYWORD, "and") or self.current_tok.matches(
-            T_KEYWORD, "or"
-        )
+        cond: bool = self.current_tok.matches(
+            T_KEYWORD, "and"
+        ) or self.current_tok.matches(T_KEYWORD, "or")
         while cond:
-            op_tok = self.current_tok
+            op_tok: Token = self.current_tok
             res.register_advancement()
             self.advance()
             if self.current_tok.type == T_LPAREN:
                 res.register_advancement()
                 self.advance()
-            right = res.register(self.expression())
+            right: Any = res.register(self.expression())
             if res.error:
                 return res
-            left = BinOpNode(left, op_tok, right)
-            cond = self.current_tok.matches(
+            left: Any = BinOpNode(left, op_tok, right)
+            cond: bool = self.current_tok.matches(
                 T_KEYWORD, "and"
             ) or self.current_tok.matches(T_KEYWORD, "or")
         return res.success(left)
 
-    def if_expr(self, pos_start):
-        res = ParseResult()
-        condition_node = res.register(self.get_condition())
+    def if_expr(self, pos_start: Position) -> ParseResult:
+        res: ParseResult = ParseResult()
+        condition_node: Any = res.register(self.get_condition())
         if res.error:
             return res
         if self.current_tok.type == T_EOL:
@@ -239,18 +242,18 @@ class Parser:
             )
         res.register_advancement()
         self.advance()
-        if_body = []
+        if_body: list[Any] = []
         if self.current_tok.type == T_EOL:
             res.register_advancement()
             self.advance()
-        statement = res.register(self.statement())
+        statement: Any = res.register(self.statement())
         if res.error:
             return res
         if_body.append(statement)
         while True:
             if self.current_tok.type in (T_RCURVE, T_EOF):
                 break
-            statement = res.register(self.statement())
+            statement: Any = res.register(self.statement())
             if res.error:
                 return res
             if_body.append(statement)
@@ -286,18 +289,18 @@ class Parser:
                 )
             res.register_advancement()
             self.advance()
-            else_body = []
+            else_body: list[Any] = []
             if self.current_tok.type == T_EOL:
                 res.register_advancement()
                 self.advance()
-            statement = res.register(self.statement())
+            statement: Any = res.register(self.statement())
             if res.error:
                 return res
             else_body.append(statement)
             while True:
                 if self.current_tok.type in (T_RCURVE, T_EOF):
                     break
-                statement = res.register(self.statement())
+                statement: Any = res.register(self.statement())
                 if res.error:
                     return res
                 else_body.append(statement)
@@ -320,19 +323,21 @@ class Parser:
             self.advance()
         return res.success(IfNode(condition_node, if_body))
 
-    def function_expr(self, var_name, allow_declaration=True):
-        res = ParseResult()
-        params = []
+    def function_expr(
+        self, var_name: Token, allow_declaration: bool = True
+    ) -> ParseResult:
+        res: ParseResult = ParseResult()
+        params: list[Any] = []
         if self.current_tok.type == T_RPAREN:
             res.register_advancement()
             self.advance()
         else:
-            node = res.register(self.expression())
+            node: Any = res.register(self.expression())
             params.append(node)
             while self.current_tok.type == T_COMMA:
                 res.register_advancement()
                 self.advance()
-                node = res.register(self.expression())
+                node: Any = res.register(self.expression())
                 if res.error:
                     return res
                 params.append(node)
@@ -366,16 +371,16 @@ class Parser:
             if self.current_tok.type == T_EOL:
                 res.register_advancement()
                 self.advance()
-            body = []
+            body: list[Any] = []
             self.context.display_name = var_name.value
-            statement = res.register(self.statement())
+            statement: Any = res.register(self.statement())
             if res.error:
                 return res
             body.append(statement)
             while True:
                 if self.current_tok.type in (T_RCURVE, T_EOF):
                     break
-                statement = res.register(self.statement())
+                statement: Any = res.register(self.statement())
                 if res.error:
                     return res
                 body.append(statement)
@@ -399,19 +404,19 @@ class Parser:
             self.advance()
         return res.success(FunctionCallNode(var_name, params))
 
-    def make_u_string(self, check_commas=True):
-        res = ParseResult()
-        string = ""
-        condition = (T_COMMA, T_EOL) if check_commas else (T_EOL,)
+    def make_u_string(self, check_commas: bool = True) -> str:
+        res: ParseResult = ParseResult()
+        string: str = ""
+        condition: list[str] = [T_COMMA, T_EOL] if check_commas else [T_EOL]
         while self.current_tok.type not in condition:
             string += str(self.current_tok.value) + " "
             res.register_advancement()
             self.advance()
         return string.strip()
 
-    def atom(self):
-        res = ParseResult()
-        tok = self.current_tok
+    def atom(self) -> ParseResult:
+        res: Any = ParseResult()
+        tok: Token = self.current_tok
 
         if tok.type in (T_DECIMAL, T_FLOAT, T_HEXADECIMAL):
             res.register_advancement()
@@ -442,7 +447,7 @@ class Parser:
         elif tok.type == T_LPAREN:
             res.register_advancement()
             self.advance()
-            expr = res.register(self.expression())
+            expr: Any = res.register(self.expression())
             if res.error:
                 return res
             if self.current_tok.type == T_RPAREN:
@@ -458,12 +463,12 @@ class Parser:
         elif tok.type == T_LSQUARE:
             res.register_advancement()
             self.advance()
-            value_nodes = []
+            value_nodes: list[Any] = []
             if self.current_tok.type == T_RSQUARE:
                 res.register_advancement()
                 self.advance()
             else:
-                value_node = res.register(self.expression())
+                value_node: Any = res.register(self.expression())
                 if res.error:
                     return res
                 value_nodes.append(value_node)
@@ -471,7 +476,7 @@ class Parser:
                 while self.current_tok.type == T_COMMA:
                     res.register_advancement()
                     self.advance()
-                    value_node = res.register(self.expression())
+                    value_node: Any = res.register(self.expression())
                     if res.error or value_node is None:
                         return res
                     value_nodes.append(value_node)
@@ -485,13 +490,13 @@ class Parser:
                             self.context,
                         )
                     )
-                end_tok = self.current_tok
+                end_tok: Token = self.current_tok
                 res.register_advancement()
                 self.advance()
                 if self.current_tok.type == T_LSQUARE:
                     res.register_advancement()
                     self.advance()
-                    key = res.register(self.expression())
+                    key: Any = res.register(self.expression())
                     if res.error:
                         return res
                     if self.current_tok.type != T_RSQUARE:
@@ -505,13 +510,13 @@ class Parser:
                         )
                     res.register_advancement()
                     self.advance()
-                    accumulator = BinOpNode(
+                    accumulator: BinOpNode = BinOpNode(
                         ArrayNode(value_nodes, tok.pos_start, end_tok.pos_end),
                         Token(T_LSQUARE),
                         ObjectKeyNode(key),
                     )
-                    access_method = T_LSQUARE
-                    res = self.get_keys(
+                    access_method: str = T_LSQUARE
+                    res: Any = self.get_keys(
                         accumulator,
                         access_method,
                         res,
@@ -526,12 +531,12 @@ class Parser:
         elif tok.type == T_LCURVE:
             res.register_advancement()
             self.advance()
-            value_nodes = {}
+            value_dict: dict[Any, Any] = {}
             if self.current_tok.type == T_RCURVE:
                 res.register_advancement()
                 self.advance()
             else:
-                key_node = res.register(self.expression())
+                key_node: Any = res.register(self.expression())
                 if res.error:
                     return res
                 if self.current_tok.type != T_COLON:
@@ -545,10 +550,10 @@ class Parser:
                     )
                 res.register_advancement()
                 self.advance()
-                value_node = res.register(self.expression())
+                value_node: Any = res.register(self.expression())
                 if res.error:
                     return res
-                value_nodes[key_node] = value_node
+                value_dict[key_node] = value_node
                 while self.current_tok.type == T_COMMA:
                     res.register_advancement()
                     self.advance()
@@ -569,7 +574,7 @@ class Parser:
                     value_node = res.register(self.expression())
                     if res.error:
                         return res
-                    value_nodes[key_node] = value_node
+                    value_dict[key_node] = value_node
                 if self.current_tok.type != T_RCURVE:
                     return res.failure(
                         InvalidSyntaxError(
@@ -579,13 +584,13 @@ class Parser:
                             self.context,
                         )
                     )
-                end_tok = self.current_tok
+                end_tok: Token = self.current_tok
                 res.register_advancement()
                 self.advance()
                 if self.current_tok.type == T_LSQUARE:
                     res.register_advancement()
                     self.advance()
-                    key = res.register(self.expression())
+                    key: Any = res.register(self.expression())
                     if res.error:
                         return res
                     if self.current_tok.type != T_RSQUARE:
@@ -599,15 +604,15 @@ class Parser:
                         )
                     res.register_advancement()
                     self.advance()
-                    accumulator = BinOpNode(
+                    accumulator: BinOpNode = BinOpNode(
                         AssociativeArrayNode(
-                            value_nodes, tok.pos_start, end_tok.pos_end
+                            value_dict, tok.pos_start, end_tok.pos_end
                         ),
                         Token(T_LSQUARE),
                         ObjectKeyNode(key),
                     )
-                    access_method = T_LSQUARE
-                    res = self.get_keys(
+                    access_method: str = T_LSQUARE
+                    res: Any = self.get_keys(
                         accumulator,
                         access_method,
                         res,
@@ -618,18 +623,18 @@ class Parser:
                 if self.current_tok.type == T_DOT:
                     res.register_advancement()
                     self.advance()
-                    key = self.current_tok
+                    key: Any = self.current_tok
                     res.register_advancement()
                     self.advance()
-                    accumulator = BinOpNode(
+                    accumulator: BinOpNode = BinOpNode(
                         AssociativeArrayNode(
-                            value_nodes, tok.pos_start, end_tok.pos_end
+                            value_dict, tok.pos_start, end_tok.pos_end
                         ),
                         Token(T_DOT),
                         ObjectKeyNode(key),
                     )
-                    access_method = T_DOT
-                    res = self.get_keys(
+                    access_method: str = T_DOT
+                    res: Any = self.get_keys(
                         accumulator,
                         access_method,
                         res,
@@ -639,7 +644,7 @@ class Parser:
                     return res
             return res.success(
                 AssociativeArrayNode(
-                    value_nodes, tok.pos_start, self.current_tok.pos_end
+                    value_dict, tok.pos_start, self.current_tok.pos_end
                 )
             )
 
@@ -652,43 +657,43 @@ class Parser:
             )
         )
 
-    def factor(self):
-        res = ParseResult()
-        tok = self.current_tok
+    def factor(self) -> ParseResult:
+        res: ParseResult = ParseResult()
+        tok: Token = self.current_tok
         if tok.type in (T_PLUS, T_MINUS, T_KEYWORD):
             res.register_advancement()
             self.advance()
             if tok.matches(T_KEYWORD, "not"):
-                factor = res.register(self.expression())
+                factor: Any = res.register(self.expression())
                 if res.error:
                     return res
             else:
-                factor = res.register(self.factor())
+                factor: Any = res.register(self.factor())
                 if res.error:
                     return res
             return res.success(UnaryOpNode(tok, factor))
 
         return self.atom()
 
-    def term(self):
-        return self.bin_op(self.factor, (T_MULTIPLY, T_DIVIDE, T_DOT, T_KEYWORD))
+    def term(self) -> ParseResult:
+        return self.bin_op(self.factor, [T_MULTIPLY, T_DIVIDE, T_DOT, T_KEYWORD])
 
-    def expression(self):
-        res = ParseResult()
+    def expression(self) -> ParseResult:
+        res: Any = ParseResult()
 
         if self.current_tok.type == T_IDENTIFIER:
-            var_name = self.current_tok
+            var_name: Token = self.current_tok
             res.register_advancement()
             self.advance()
 
             if self.current_tok.type == T_LSQUARE:
-                op_tok = self.current_tok
+                op_tok: Token = self.current_tok
                 res.register_advancement()
                 self.advance()
-                inner_key = res.register(self.expression())
+                inner_key: Any = res.register(self.expression())
                 if res.error or inner_key is None:
                     return res
-                accumulator = BinOpNode(
+                accumulator: BinOpNode = BinOpNode(
                     VarAccessNode(var_name), op_tok, ObjectKeyNode(inner_key)
                 )
                 if self.current_tok.type != T_RSQUARE:
@@ -702,8 +707,8 @@ class Parser:
                     )
                 res.register_advancement()
                 self.advance()
-                access_method = T_LSQUARE
-                res = self.get_keys(
+                access_method: str = T_LSQUARE
+                res: Any = self.get_keys(
                     accumulator,
                     access_method,
                     res,
@@ -713,16 +718,16 @@ class Parser:
                 return res
 
             if self.current_tok.type == T_DOT:
-                op_tok = self.current_tok
+                op_tok: Token = self.current_tok
                 res.register_advancement()
                 self.advance()
-                accumulator = BinOpNode(
+                accumulator: BinOpNode = BinOpNode(
                     VarAccessNode(var_name), op_tok, ObjectKeyNode(self.current_tok)
                 )
                 res.register_advancement()
                 self.advance()
-                access_method = T_DOT
-                res = self.get_keys(
+                access_method: str = T_DOT
+                res: Any = self.get_keys(
                     accumulator, access_method, res, var_name, disable_assignment=True
                 )
                 return res
@@ -730,13 +735,15 @@ class Parser:
             res.register_recession()
             self.recede()
 
-        node = res.register(self.bin_op(self.term, (T_PLUS, T_MINUS, T_DOT, T_KEYWORD)))
+        node: Any = res.register(
+            self.bin_op(self.term, [T_PLUS, T_MINUS, T_DOT, T_KEYWORD])
+        )
         if res.error or node is None:
             return res
         if self.current_tok.type == T_QUESTION_MARK:
             res.register_advancement()
             self.advance()
-            true_node = res.register(self.expression())
+            true_node: Any = res.register(self.expression())
             if res.error:
                 return res
             if self.current_tok.type != T_COLON:
@@ -750,14 +757,14 @@ class Parser:
                 )
             res.register_advancement()
             self.advance()
-            false_node = res.register(self.expression())
+            false_node: Any = res.register(self.expression())
             if res.error:
                 return res
             return res.success(TernaryOpNode(node, true_node, false_node))
         return res.success(node)
 
-    def statement(self):
-        res = ParseResult()
+    def statement(self) -> ParseResult:
+        res: Any = ParseResult()
         if self.current_tok.matches(T_KEYWORD, "global"):
             res.register_advancement()
             self.advance()
@@ -770,7 +777,7 @@ class Parser:
                         self.context,
                     )
                 )
-            var_name = self.current_tok
+            var_name: Token = self.current_tok
             res.register_advancement()
             self.advance()
 
@@ -786,7 +793,7 @@ class Parser:
 
             res.register_advancement()
             self.advance()
-            expr = res.register(self.expression())
+            expr: Any = res.register(self.expression())
             if res.error:
                 return res
             if self.current_tok.type not in (T_EOL, T_EOF):
@@ -806,7 +813,7 @@ class Parser:
             res.register_advancement()
             self.advance()
             if self.current_tok.type != T_EOL:
-                node = res.register(self.expression())
+                return_node: Any = res.register(self.expression())
                 if res.error:
                     return res
                 if self.current_tok.type not in (T_EOL, T_EOF):
@@ -820,14 +827,14 @@ class Parser:
                     )
                 res.register_advancement()
                 self.advance()
-                return res.success(ReturnNode(node))
+                return res.success(ReturnNode(return_node))
             return res.success(ReturnNode(None))
 
         elif self.current_tok.matches(T_KEYWORD, "if"):
-            pos_start = self.current_tok.pos_start
+            pos_start: Position = self.current_tok.pos_start
             res.register_advancement()
             self.advance()
-            res = self.if_expr(pos_start)
+            res: Any = self.if_expr(pos_start)
             if self.current_tok.type not in (T_EOL, T_EOF):
                 return res.failure(
                     InvalidSyntaxError(
@@ -842,13 +849,13 @@ class Parser:
             return res
 
         elif self.current_tok.type == T_IDENTIFIER:
-            var_name = self.current_tok
+            var_name: Token = self.current_tok
             res.register_advancement()
             self.advance()
             if self.current_tok.type == T_LPAREN:
                 res.register_advancement()
                 self.advance()
-                res = self.function_expr(var_name)
+                res: Any = self.function_expr(var_name)
                 if self.current_tok.type not in (T_EOL, T_EOF):
                     return res.failure(
                         InvalidSyntaxError(
@@ -865,7 +872,7 @@ class Parser:
             elif self.current_tok.type == T_ASSIGNMENT:
                 res.register_advancement()
                 self.advance()
-                expr = res.register(self.expression())
+                expr: Any = res.register(self.expression())
                 if res.error:
                     return res
                 if self.current_tok.type not in (T_EOL, T_EOF):
@@ -893,7 +900,7 @@ class Parser:
                             self.context,
                         )
                     )
-                value_node = StringNode(self.current_tok, quoted=False)
+                value_node: Any = StringNode(self.current_tok, quoted=False)
                 res.register_advancement()
                 self.advance()
                 if self.current_tok.type not in (T_EOL, T_EOF):
@@ -910,17 +917,17 @@ class Parser:
                 return res.success(VarAssignNode(var_name, value_node))
 
             elif self.current_tok.type == T_DOT:
-                op_tok = self.current_tok
+                op_tok: Token = self.current_tok
                 res.register_advancement()
                 self.advance()
-                inner_key = self.current_tok
-                accumulator = BinOpNode(
+                inner_key: Any = self.current_tok
+                accumulator: BinOpNode = BinOpNode(
                     VarAccessNode(var_name), op_tok, ObjectKeyNode(inner_key)
                 )
                 res.register_advancement()
                 self.advance()
-                access_method = T_DOT
-                res = self.get_keys(
+                access_method: str = T_DOT
+                res: Any = self.get_keys(
                     accumulator, access_method, res, var_name, disable_access=True
                 )
                 if self.current_tok.type not in (T_EOL, T_EOF):
@@ -937,10 +944,10 @@ class Parser:
                 return res
 
             elif self.current_tok.type == T_LSQUARE:
-                op_tok = self.current_tok
+                op_tok: Token = self.current_tok
                 res.register_advancement()
                 self.advance()
-                inner_key = res.register(self.expression())
+                inner_key: Any = res.register(self.expression())
                 if res.error or inner_key is None:
                     return res
                 accumulator = BinOpNode(VarAccessNode(var_name), op_tok, inner_key)
@@ -956,8 +963,8 @@ class Parser:
                     )
                 res.register_advancement()
                 self.advance()
-                access_method = T_LSQUARE
-                res = self.get_keys(
+                access_method: str = T_LSQUARE
+                res: Any = self.get_keys(
                     accumulator, access_method, res, var_name, disable_access=True
                 )
                 if self.current_tok.type not in (T_EOL, T_EOF):
@@ -973,13 +980,13 @@ class Parser:
                 self.advance()
                 return res
         elif self.current_tok.matches(T_COMMAND, "MsgBox"):
-            name = self.current_tok
+            name: Token = self.current_tok
             res.register_advancement()
             self.advance()
             if self.current_tok.type == T_PERCENT:
                 res.register_advancement()
                 self.advance()
-                text = res.register(self.expression())
+                text: str = res.register(self.expression())
                 if res.error:
                     return res
                 return res.success(CommandNode(name, text=text))
@@ -995,7 +1002,7 @@ class Parser:
                             self.context,
                         )
                     )
-                option = NumberNode(self.current_tok)
+                option: NumberNode = NumberNode(self.current_tok)
                 res.register_advancement()
                 self.advance()
                 if self.current_tok.type != T_COMMA:
@@ -1025,7 +1032,7 @@ class Parser:
                                     self.context,
                                 )
                             )
-                        timeout = NumberNode(self.current_tok)
+                        timeout: NumberNode = NumberNode(self.current_tok)
                         res.register_advancement()
                         self.advance()
                         if self.current_tok.type not in (T_EOL, T_EOF):
@@ -1051,7 +1058,7 @@ class Parser:
                         )
                     return res.success(CommandNode(name, option=option, text=text))
                 else:
-                    title = self.make_u_string(name)
+                    title: Any = self.make_u_string()
                     if self.current_tok.type != T_COMMA:
                         return res.failure(
                             InvalidSyntaxError(
@@ -1063,7 +1070,7 @@ class Parser:
                         )
                     res.register_advancement()
                     self.advance()
-                    text = self.make_u_string(name)
+                    text: str = self.make_u_string()
                     if self.current_tok.type == T_COMMA:
                         res.register_advancement()
                         self.advance()
@@ -1100,7 +1107,7 @@ class Parser:
                                     self.context,
                                 )
                             )
-                        timeout = NumberNode(self.current_tok)
+                        timeout: NumberNode = NumberNode(self.current_tok)
                         res.register_advancement()
                         self.advance()
                         if self.current_tok.type not in (T_EOL, T_EOF):
@@ -1135,9 +1142,9 @@ class Parser:
                     return res.success(
                         CommandNode(name, option=option, title=title, text=text)
                     )
-            pos_start = self.current_tok.pos_start
-            text = self.make_u_string(check_commas=False)
-            node = StringNode(Token(T_STRING, text, pos_start=pos_start))
+            pos_start: Position = self.current_tok.pos_start
+            text: str = self.make_u_string(check_commas=False)
+            node: StringNode = StringNode(Token(T_STRING, text, pos_start=pos_start))
             if self.current_tok.type not in (T_EOL, T_EOF):
                 return res.failure(
                     InvalidSyntaxError(
@@ -1153,7 +1160,7 @@ class Parser:
 
         elif self.current_tok.type == T_BCOMMENT_START:
             self.recede()
-            previous_tok = self.current_tok
+            previous_tok: Token = self.current_tok
             self.advance()
             self.advance()
             if (previous_tok.type == T_EOL or previous_tok.type == T_SOF) and (

@@ -1,17 +1,17 @@
+import argparse
 import os
 import sys
-import argparse
 
 
-def start():
-    working_dir = os.getcwd()
+def start() -> int:
+    working_dir: str = os.getcwd()
     sys.path.append(working_dir)
-    project_root = os.path.dirname(os.path.abspath(__file__))
+    project_root: str = os.path.dirname(os.path.abspath(__file__))
     sys.path.append(project_root)
     from main import main
 
-    input_file = "<stdin>"
-    arg_parser = argparse.ArgumentParser()
+    input_file: str = "<stdin>"
+    arg_parser: argparse.ArgumentParser = argparse.ArgumentParser()
     arg_parser.add_argument(
         "-i",
         "--input",
@@ -26,9 +26,9 @@ def start():
         const=input,
         help="To run the interpreter in debug mode.",
     )
-    args = arg_parser.parse_args()
-    input_file = args.input
-    debug_mode = True if args.debug is not None else False
+    args: argparse.Namespace = arg_parser.parse_args()
+    input_file: str = args.input
+    debug_mode: bool = True if args.debug is not None else False
 
     return main(input_file, debug_mode)
 

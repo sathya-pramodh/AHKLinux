@@ -1,14 +1,16 @@
+from typing import Any, Self
+
 from base_classes.value import Value
-from data_types.boolean import Boolean
 from constants import T_HEXADECIMAL
+from data_types.boolean import Boolean
 from error_classes.runtime_error import RunTimeError
 
 
 class Number(Value):
-    def __init__(self, value, type_):
+    def __init__(self, value: Any, type_: str):
         super().__init__()
-        self.value = value
-        self.type = type_
+        self.value: Any = value
+        self.type: str = type_
         if self.type == T_HEXADECIMAL:
             self.boolean = True if int(self.value, base=16) else False
             self.repr_boolean = (
@@ -18,7 +20,7 @@ class Number(Value):
             self.boolean = True if self.value else False
             self.repr_boolean = Boolean("true") if self.value else Boolean("false")
 
-    def added_to(self, other):
+    def added_to(self, other: Self) -> tuple[Self | None, RunTimeError | None]:
         if isinstance(other, Number):
             if self.type == T_HEXADECIMAL and other.type == T_HEXADECIMAL:
                 return (
@@ -54,7 +56,7 @@ class Number(Value):
             self.context,
         )
 
-    def subtracted_by(self, other):
+    def subtracted_by(self, other: Self) -> tuple[Self | None, RunTimeError | None]:
         if isinstance(other, Number):
             if self.type == T_HEXADECIMAL and other.type == T_HEXADECIMAL:
                 return (
@@ -89,7 +91,7 @@ class Number(Value):
             self.context,
         )
 
-    def multiplied_by(self, other):
+    def multiplied_by(self, other: Self) -> tuple[Self | None, RunTimeError | None]:
         if isinstance(other, Number):
             if self.type == T_HEXADECIMAL and other.type == T_HEXADECIMAL:
                 return (
@@ -124,7 +126,7 @@ class Number(Value):
             self.context,
         )
 
-    def divided_by(self, other):
+    def divided_by(self, other: Self) -> tuple[Self | None, RunTimeError | None]:
         if isinstance(other, Number):
             if self.type == T_HEXADECIMAL and other.type == T_HEXADECIMAL:
                 if int(other.value, base=16) == 0:
@@ -173,11 +175,11 @@ class Number(Value):
             self.context,
         )
 
-    def copy(self):
-        copy = Number(self.value, self.type)
+    def copy(self) -> Self:
+        copy: Self = Number(self.value, self.type)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
         return copy
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.value}"

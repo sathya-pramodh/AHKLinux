@@ -1,4 +1,4 @@
-ALL_COMBINATIONS = {
+ALL_COMBINATIONS: dict[int, str] = {
     0: "OK",
     1: "OK/Cancel",
     2: "Abort/Retry/Ignore",
