@@ -144,6 +144,22 @@ python3 cli.py -h
 ```
 python3 tests.py
 ```
+- Run particular tests by running this command in the project's working directory (src/AHKLinux/)
+```
+python3 -m unittest tests.<test_name>
+```
+- The class names are listed below:
+  - TestArithmetic
+  - TestBoolean
+  - TestStrings
+  - TestArrays
+  - TestAssociativeArrays
+  - TestVariable
+  - TestExpressions
+  - TestStatements
+  - TestFunctions
+  - TestComments
+  - TestErrors
 
 # Contribution
 - Code should be written in Python3 ONLY and must follow PEP8 conventions as far as possible.
