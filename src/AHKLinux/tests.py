@@ -11,12 +11,13 @@ BASE_CMD: str = "python3 cli.py --input {}"
 MSGBOX_OUTPUT_FORMAT: str = (
     "MsgBox with title: '{}' and text: '{}' is being displayed.\n"
 )
-ASSIGN_OUTPUT_FORMAT: str = "'{}' inside '{}' has been assigned the value {}.\n"
+ASSIGN_OUTPUT_FORMAT: str = "'{}' inside '{}' has been assigned the value '{}'.\n"
 KEY_ASSIGN_OUTPUT_FORMAT: str = "Key '{}' was assigned the value {}.\n"
 FUNC_DECLARE_OUTPUT_FORMAT: str = "Function with name '{}' has been declared.\n"
 ERROR_FORMAT: str = (
     "Traceback (most recent call last):\n File: '{}', line {}, in {}\n   {}\n{}\n"
 )
+TEST_FORMAT: str = "Testing unit '{}'. Press Enter whenever the message box appears"
 
 
 def exec_msgbox_debug_cmd(file: str, value: int | float | str) -> tuple[str, str]:
@@ -306,6 +307,30 @@ class TestVariable(unittest.TestCase):
 
     def test_expr(self) -> None:
         file: str = "tests/variable/expr.ahk"
+        self.assertEqual(main.main(file, False), 0)
+
+    def test_debug_embed(self) -> None:
+        file: str = "tests/variable/embed.ahk"
+        cmd: str = BASE_DEBUG_CMD.format(file).split()
+        proc: subprocess.Popen[bytes] = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        expected_output = (
+            ASSIGN_OUTPUT_FORMAT.format("a", "<module>", 10)
+            + MSGBOX_OUTPUT_FORMAT.format(file, "This is a test for embeds 10 .")
+            + ASSIGN_OUTPUT_FORMAT.format(
+                "a", "<module>", " This is a test for embeds 10."
+            )
+            + MSGBOX_OUTPUT_FORMAT.format(file, " This is a test for embeds 10.")
+        )
+        stdout, stderr = proc.communicate()
+        if stderr:
+            self.assertEqual(stderr.decode("UTF-8"), expected_output)
+        else:
+            self.assertEqual(stdout.decode("UTF-8"), expected_output)
+
+    def test_embed(self) -> None:
+        file: str = "tests/variable/embed.ahk"
         self.assertEqual(main.main(file, False), 0)
 
 
