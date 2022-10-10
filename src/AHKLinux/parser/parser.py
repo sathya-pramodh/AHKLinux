@@ -1144,7 +1144,9 @@ class Parser:
                     )
             pos_start: Position = self.current_tok.pos_start
             text: str = self.make_u_string(check_commas=False)
-            node: StringNode = StringNode(Token(T_STRING, text, pos_start=pos_start), quoted=False)
+            node: StringNode = StringNode(
+                Token(T_STRING, text, pos_start=pos_start), quoted=False
+            )
             if self.current_tok.type not in (T_EOL, T_EOF):
                 return res.failure(
                     InvalidSyntaxError(

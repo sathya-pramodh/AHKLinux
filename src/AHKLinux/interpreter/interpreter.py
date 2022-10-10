@@ -36,7 +36,9 @@ class Interpreter:
 
     def visit_StringNode(self, node: Any, context: Context) -> RuntimeResult:
         if not node.quoted:
-            var_names: list[str] = re.findall("%\s*[a-zA-Z0-9_@#$]*\s*%", node.tok.value)
+            var_names: list[str] = re.findall(
+                "%\s*[a-zA-Z0-9_@#$]*\s*%", node.tok.value
+            )
             for var_name in var_names:
                 var_name = var_name.replace("%", "").strip()
                 var_value: Any | None = context.symbol_table.get(var_name)
@@ -156,7 +158,7 @@ class Interpreter:
                 context.parent.symbol_table.set(var_name, (value, True))
             else:
                 context.symbol_table.set(var_name, (value, False))
-        debug_msg: str = "'{}' inside '{}' has been assigned the value {}.".format(
+        debug_msg: str = "'{}' inside '{}' has been assigned the value '{}'.".format(
             var_name, context.display_name, value
         )
         value.set_context(context).set_pos(node.pos_start, node.pos_end)
