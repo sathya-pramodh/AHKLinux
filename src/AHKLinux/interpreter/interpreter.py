@@ -36,9 +36,9 @@ class Interpreter:
 
     def visit_StringNode(self, node: Any, context: Context) -> RuntimeResult:
         if not node.quoted:
-            var_names: list[str] = re.findall("%[a-zA-Z0-9_@#$]*%", node.tok.value)
+            var_names: list[str] = re.findall("%\s*[a-zA-Z0-9_@#$]*\s*%", node.tok.value)
             for var_name in var_names:
-                var_name = var_name.replace("%", "")
+                var_name = var_name.replace("%", "").strip()
                 var_value: Any | None = context.symbol_table.get(var_name)
                 if var_value is None:
                     return RuntimeResult().failure(
@@ -59,7 +59,7 @@ class Interpreter:
                         )
                     )
                 node.tok.value = re.sub(
-                    "%[a-zA-Z0-9_@#$]*%",
+                    "%\s*[a-zA-Z0-9_@#$]*\s*%",
                     str(var_value),
                     node.tok.value,
                     count=1,
