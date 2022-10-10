@@ -148,7 +148,7 @@ python3 tests.py
 ```
 python3 -m unittest tests.<test_name>
 ```
-- The class names are listed below:
+- The test names are listed below:
   - TestArithmetic
   - TestBoolean
   - TestStrings
