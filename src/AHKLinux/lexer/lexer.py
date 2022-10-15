@@ -1,5 +1,3 @@
-from typing import Any
-
 from base_classes.context import Context
 from base_classes.position import Position
 from base_classes.tokens import Token
