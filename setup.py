@@ -27,7 +27,7 @@ setup(
     install_requires=["tk", "pillow", "typing"],
     entry_points={
         "console_scripts": [
-            "ahk = AHKLinux.init:start",
+            "ahk = AHKLinux.cli:start",
         ]
     },
 )
