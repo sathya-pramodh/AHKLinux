@@ -110,7 +110,7 @@ class Lexer:
                 if next_char is not None and next_char == "=":
                     self.advance()
                     tokens.append(Token(T_ASSIGNMENT, ":=", pos_start=self.pos))
-                elif next_char is not None:
+                elif next_char is not None and next_char == ":":
                     tokens.append(Token(T_COLON, ":", pos_start=self.pos))
                 else:
                     char: str | None = self.current_char
