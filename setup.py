@@ -9,7 +9,7 @@ def get_long_description():
 
 setup(
     name="AHKLinux",
-    version="v0.0.1",
+    version="v0.0.1-backport-3.10",
     author="sathya-pramodh",
     author_email="sathyapramodh17@gmail.com",
     description="An AHK interpreter for Linux.",
@@ -23,8 +23,8 @@ setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
     ],
-    python_requires=">=3.11",
-    install_requires=["tkinter", "pillow", "typing_extensions", "typing"],
+    python_requires=">=3.10",
+    install_requires=["tk", "pillow", "typing_extensions", "typing"],
     entry_points={
         "console_scripts": [
             "ahk = AHKLinux.init:start",
