@@ -1,4 +1,5 @@
-from typing import Any, Self
+from typing import Any
+from typing_extensions import Self
 
 from base_classes.value import Value
 from constants import T_HEXADECIMAL

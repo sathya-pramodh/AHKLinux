@@ -1,4 +1,5 @@
-from typing import Any, Self
+from typing import Any
+from typing_extensions import Self
 
 from base_classes.position import Position
 from base_classes.symbol_table import SymbolTable

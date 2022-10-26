@@ -1,4 +1,4 @@
-from typing import Self
+from typing_extensions import Self
 
 from base_classes.context import Context
 from base_classes.position import Position
