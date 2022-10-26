@@ -24,7 +24,7 @@ setup(
         "License :: OSI Approved :: MIT License",
     ],
     python_requires=">=3.11",
-    install_requires=["tkinter", "pillow", "typing_extensions", "typing"],
+    install_requires=["tk", "pillow", "typing"],
     entry_points={
         "console_scripts": [
             "ahk = AHKLinux.init:start",
