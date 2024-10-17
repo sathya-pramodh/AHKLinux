@@ -1,4 +1,4 @@
-# This project is still in development
+# This project is no longer in development
 # AHKLinux
 An Interpreter for AutoHotKey on Linux **(planned only for X11)**.
 - The idea of the project is to convert all the AHK Win API calls into X11 server calls.
